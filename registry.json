@@ -110,17 +110,6 @@
       "minNoctaliaVersion": "3.6.0",
       "license": "GPLv3",
       "lastUpdated": "2025-12-27T12:15:45+01:00"
-    },
-    {
-      "id": "virtual-keyboard",
-      "name": "Virtual Keyboard",
-      "version": "1.0.0",
-      "author": "Adrien Piechocki",
-      "description": "A Virtual Keyboard plugin made for accessibility.",
-      "repository": "https://github.com/AdrienPiechocki/noctalia-virtual-keyboard-plugin",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2025-12-12T12:12:32+01:00"
     }
   ]
 }
