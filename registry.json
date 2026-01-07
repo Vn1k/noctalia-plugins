@@ -65,7 +65,7 @@
     {
       "id": "hello-world",
       "name": "Hello World",
-      "version": "1.0.6",
+      "version": "1.0.7",
       "author": "Noctalia Team <team@noctalia.dev>",
       "description": "A simple Hello World plugin demonstrating functionalities. For developers only.",
       "repository": "https://github.com/noctalia-dev/noctalia-plugins",
@@ -74,7 +74,7 @@
       "tags": [
         "Development"
       ],
-      "lastUpdated": "2026-01-06T23:35:54-05:00"
+      "lastUpdated": "2026-01-07T08:58:45-05:00"
     },
     {
       "id": "kaomoji-provider",
