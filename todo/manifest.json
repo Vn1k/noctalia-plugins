@@ -21,6 +21,13 @@
   "metadata": {
     "defaultSettings": {
       "todos": [],
+      "pages": [
+        {
+          "id": 0,
+          "name": "General"
+        }
+      ],
+      "current_page_id": 0,
       "count": 0,
       "completedCount": 0,
       "showCompleted": true,
