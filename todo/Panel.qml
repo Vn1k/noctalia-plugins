@@ -270,7 +270,6 @@ Item {
                 checked: index === tabBar.currentIndex
 
                 Component.onCompleted: {
-                  // All tabs have rounded corners on both sides
                   topLeftRadius = Style.iRadiusM;
                   bottomLeftRadius = Style.iRadiusM;
                   topRightRadius = Style.iRadiusM;
@@ -321,7 +320,7 @@ Item {
               delegate: Item {
                 id: delegateItem
                 width: ListView.view.width
-                height: Style.baseWidgetSize
+                height: Style.baseWidgetSize + Style.marginS
 
                 required property int index
                 required property var modelData

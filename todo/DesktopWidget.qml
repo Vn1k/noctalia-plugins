@@ -221,6 +221,7 @@ DraggableDesktopWidget {
 
     // Page selector using tab components - only visible when expanded
     NTabBar {
+      id: tabBar
       Layout.fillWidth: true
       visible: expanded
       Layout.topMargin: scaledMarginS
@@ -248,10 +249,16 @@ DraggableDesktopWidget {
         delegate: NTabButton {
           text: modelData.name
           tabIndex: index
-          checked: index === parent.currentPageIndex
+          checked: index === tabBar.currentPageIndex
+
+          color: showBackground ?
+                 (isHovered ? Color.mHover : (checked ? Color.mPrimary : Color.mOnPrimary)) :
+                 (isHovered ? Color.mHover : (checked ? "transparent" : "transparent"))
+
+          border.width: showBackground ? 0 : (checked ? 1 : 0)
+          border.color: Color.mPrimary
 
           Component.onCompleted: {
-            // All tabs have rounded corners on both sides
             topLeftRadius = Style.iRadiusM;
             bottomLeftRadius = Style.iRadiusM;
             topRightRadius = Style.iRadiusM;
@@ -278,8 +285,8 @@ DraggableDesktopWidget {
         anchors.fill: parent
         color: root.todoBg
         radius: scaledRadiusM
-        border.color: showBackground ? Color.mOutline : "transparent"
-        border.width: showBackground ? 1 : 0
+        // border.color: showBackground ? Color.mOutline : "transparent"
+        // border.width: showBackground ? 1 : 0
       }
 
       // Inner container that is fully inset from the border area
