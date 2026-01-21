@@ -1,0 +1,26 @@
+{
+  "id": "niri-layout-mode",
+  "name": "Niri Layout Switcher",
+  "version": "1.0.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "Vinik",
+  "license": "MIT",
+  "repository": "https://github.com/noctalia-dev/noctalia-plugins",
+  "description": "Switch Niri layouts (Center/Split)",
+  "tags": [
+    "Bar",
+    "System"
+  ],
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "mode": "center"
+    }
+  }
+}
