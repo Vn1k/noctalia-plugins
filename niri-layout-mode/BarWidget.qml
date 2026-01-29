@@ -10,79 +10,71 @@ import qs.Services.System
 
 Rectangle {
     id: root
+    property string currentMode: "center" 
 
-    property var pluginApi: null
-    // LOG 1: Cek apakah setting berhasil dibaca atau default ke center
-    readonly property string mode: {
-        var m = pluginApi?.pluginSettings?.mode || "center"
-        return m
-    }
-
-    // LOGGING SAAT COMPONENT SIAP
     Component.onCompleted: {
-        console.log("[BarWidget] Loaded!")
-        if (pluginApi) {
-            console.log("[BarWidget] Connected to Plugin API. Current mode: " + mode)
-        } else {
-            console.warn("[BarWidget] WARNING: pluginApi is NULL! (Main.qml might be broken)")
-        }
-    }
-
-    readonly property bool isVertical: {
-        try {
-            if (Settings && Settings.data && Settings.data.bar) {
-                var pos = Settings.data.bar.position
-                return pos === "left" || pos === "right"
-            }
-        } catch (e) {
-            return false
-        }
-        return false
-    }
-
-    implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)
-    implicitHeight: Style.capsuleHeight
-
-    Layout.alignment: Qt.AlignVCenter
-    color: Style.capsuleColor
-    radius: Style.radiusL
-
-    GridLayout {
-        id: layout
-        anchors.centerIn: parent
+        Logger.d("[BarWidget] Loaded! Asking Main.qml for status...")
+        checkStatus.running = true 
+    
+    Process {
+        id: checkStatus
+        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "getMode"]
         
-        columns: 2
-        columnSpacing: Style.marginS
-
-        NIcon {
-            Layout.alignment: Qt.AlignCenter
-            icon: mode === "center" ? "focus-2" : "layout-sidebar-right"
-            color: mode === "center" ? Color.mPrimary : Color.mOnSurface
-        }
-
-        NText {
-            visible: !isVertical 
-            Layout.alignment: Qt.AlignCenter
-            text: mode === "center" ? "Center" : "Split"
-            color: Color.mOnSurface
-            pointSize: Style.fontSizeS
+        stdout: SplitParser {
+            onRead: (data) => {
+                var cleanData = data.trim()
+                if (cleanData === "center" || cleanData === "split") {
+                    root.currentMode = cleanData
+                    Logger.d("[BarWidget] Synced Initial Mode: " + cleanData)
+                }
+            }
         }
     }
 
     Process {
         id: toggleClick
-        // Command untuk memanggil fungsi toggle di Main.qml
         command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "toggle"]
         
-        // LOG 2: IPC DEBUGGING
-        // Kalau perintah sukses dijalankan
         stdout: SplitParser {
-            onRead: (data) => console.log("[BarWidget] IPC Success: " + data)
+            onRead: (data) => {
+                var cleanData = data.trim()
+                if (cleanData === "center" || cleanData === "split") {
+                    root.currentMode = cleanData // <--- INI KUNCINYA! UI berubah disini.
+                    Logger.d("[BarWidget] Click Success! New Mode: " + cleanData)
+                }
+            }
         }
-        
-        // Kalau ada error (PENTING!)
-        stderr: SplitParser {
-            onRead: (data) => console.error("[BarWidget] IPC Error: " + data)
+    }
+
+    implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)
+    implicitHeight: Style.capsuleHeight
+    Layout.alignment: Qt.AlignVCenter
+    color: Style.capsuleColor
+    radius: Style.radiusL
+
+    readonly property bool isVertical: {
+        try { return Settings.data.bar.position === "left" || Settings.data.bar.position === "right" } 
+        catch (e) { return false }
+    }
+
+    GridLayout {
+        id: layout
+        anchors.centerIn: parent
+        columns: 2
+        columnSpacing: Style.marginS
+
+        NIcon {
+            Layout.alignment: Qt.AlignCenter
+            icon: root.currentMode === "center" ? "focus-2" : "layout-sidebar-right"
+            color: root.currentMode === "center" ? Color.mPrimary : Color.mOnSurface
+        }
+
+        NText {
+            visible: !isVertical 
+            Layout.alignment: Qt.AlignCenter
+            text: root.currentMode === "center" ? "Center" : "Split"
+            color: Color.mOnSurface
+            pointSize: Style.fontSizeS
         }
     }
 
@@ -91,28 +83,14 @@ Rectangle {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         hoverEnabled: true
-        
         onClicked: {
-            console.log("[BarWidget] Clicked! Sending IPC toggle command...")
-            if (!toggleClick.running) {
-                toggleClick.running = true
-            } else {
-                console.log("[BarWidget] Command busy, ignoring click.")
-            }
+            if (!toggleClick.running) toggleClick.running = true
         }
-
         onEntered: {
             if (root.isVertical) {
-                TooltipService.show(
-                    root,                                   
-                    mode === "center" ? "Center Mode" : "Split Mode", 
-                    BarService.getTooltipDirection()     
-                )
+                TooltipService.show(root, root.currentMode === "center" ? "Center Mode" : "Split Mode", BarService.getTooltipDirection())
             }
         }
-
-        onExited: {
-            TooltipService.hide()
-        }
+        onExited: TooltipService.hide()
     }
 }
