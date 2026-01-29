@@ -15,6 +15,7 @@ Rectangle {
     Component.onCompleted: {
         Logger.d("[BarWidget] Loaded! Asking Main.qml for status...")
         checkStatus.running = true 
+    }
     
     Process {
         id: checkStatus
