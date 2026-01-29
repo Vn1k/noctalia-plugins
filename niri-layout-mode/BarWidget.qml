@@ -10,54 +10,76 @@ import qs.Services.System
 
 Rectangle {
     id: root
+    property string currentMode: "center" 
 
-    property var pluginApi: null
-    readonly property string mode: pluginApi?.pluginSettings?.mode || "center"
-
-    readonly property bool isVertical: {
-        try {
-            if (Settings && Settings.data && Settings.data.bar) {
-                var pos = Settings.data.bar.position
-                return pos === "left" || pos === "right"
-            }
-        } catch (e) {
-            return false
-        }
-        return false
+    Component.onCompleted: {
+        console.log("[BarWidget] Loaded! Asking Main.qml for status...")
+        checkStatus.running = true 
     }
-
-    implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)
-    implicitHeight: Style.capsuleHeight
-
-    Layout.alignment: Qt.AlignVCenter
-    color: Style.capsuleColor
-    radius: Style.radiusL
-
-    GridLayout {
-        id: layout
-        anchors.centerIn: parent
+    
+    Process {
+        id: checkStatus
+        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "getMode"]
         
-        columns: 2
-        columnSpacing: Style.marginS
-
-        NIcon {
-            Layout.alignment: Qt.AlignCenter
-            icon: mode === "center" ? "focus-2" : "layout-sidebar-right"
-            color: mode === "center" ? Color.mPrimary : Color.mOnSurface
-        }
-
-        NText {
-            visible: !isVertical 
-            Layout.alignment: Qt.AlignCenter
-            text: mode === "center" ? "Center" : "Split"
-            color: Color.mOnSurface
-            pointSize: Style.fontSizeS
+        stdout: SplitParser {
+            onRead: (data) => {
+                var cleanData = data.trim()
+                if (cleanData === "center" || cleanData === "split") {
+                    root.currentMode = cleanData
+                    console.log("[BarWidget] Synced Initial Mode: " + cleanData)
+                }
+            }
         }
     }
 
     Process {
         id: toggleClick
         command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "toggle"]
+        
+        stdout: SplitParser {
+            onRead: (data) => {
+                console.log("[BarWidget] Raw Response: " + data)
+                var cleanData = data.trim()
+                if (cleanData === "center" || cleanData === "split") {
+                    root.currentMode = cleanData
+                    console.log("[BarWidget] UI Updated to: " + cleanData)
+                } else {
+                    console.warn("[BarWidget] Unknown response: " + cleanData)
+                }
+            }
+        }
+    }
+
+    implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)
+    implicitHeight: Style.capsuleHeight
+    Layout.alignment: Qt.AlignVCenter
+    color: Style.capsuleColor
+    radius: Style.radiusL
+
+    readonly property bool isVertical: {
+        try { return Settings.data.bar.position === "left" || Settings.data.bar.position === "right" } 
+        catch (e) { return false }
+    }
+
+    GridLayout {
+        id: layout
+        anchors.centerIn: parent
+        columns: 2
+        columnSpacing: Style.marginS
+
+        NIcon {
+            Layout.alignment: Qt.AlignCenter
+            icon: root.currentMode === "center" ? "focus-2" : "layout-sidebar-right"
+            color: root.currentMode === "center" ? Color.mPrimary : Color.mOnSurface
+        }
+
+        NText {
+            visible: !isVertical 
+            Layout.alignment: Qt.AlignCenter
+            text: root.currentMode === "center" ? "Center" : "Split"
+            color: Color.mOnSurface
+            pointSize: Style.fontSizeS
+        }
     }
 
     MouseArea {
@@ -66,21 +88,14 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         hoverEnabled: true
         onClicked: {
+            console.log("[BarWidget] Clicked! Sending command...")
             if (!toggleClick.running) toggleClick.running = true
         }
-
         onEntered: {
             if (root.isVertical) {
-                TooltipService.show(
-                    root,                                   
-                    mode === "center" ? "Center Mode" : "Split Mode", 
-                    BarService.getTooltipDirection()     
-                )
+                TooltipService.show(root, root.currentMode === "center" ? "Center Mode" : "Split Mode", BarService.getTooltipDirection())
             }
         }
-
-        onExited: {
-            TooltipService.hide()
-        }
+        onExited: TooltipService.hide()
     }
 }
