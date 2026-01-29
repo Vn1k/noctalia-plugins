@@ -14,6 +14,7 @@ Item {
     readonly property string layoutConfig: configDir + "/layout.kdl"
 
     Component.onCompleted: {
+        Logger.i("NiriLayout", "Plugin Loaded! Starting setup process...")
         setupProcess.running = true
     }
 
@@ -21,10 +22,13 @@ Item {
         id: setupProcess
         command: ["bash", "-c", root.installScript]
 
-        stdout: (output) => {
-            if (output.trim() === "CHANGED") {
-                reloadProcess.running = true
-                ToastService.showNotice("Plugin installed & Layout injected.")
+        stdout: SplitParser {
+            onRead: (data) => {
+                Logger.d("NiriLayout", "Script Output: " + data)
+                if (data.trim() === "CHANGED") {
+                    reloadProcess.running = true
+                    ToastService.showNotice(qsTr("Plugin installed & Layout injected."))
+                }
             }
         }
     }
@@ -65,6 +69,7 @@ Item {
         target: "plugin:niri-layout-mode"
 
         function setMode(modeName) {
+            Logger.i("NiriLayout", "setMode called with: " + modeName)
             if (!pluginApi) return
 
             var targetMode = modeName.toLowerCase()
@@ -94,6 +99,7 @@ layout {
         }
         
         function toggle() {
+            Logger.d("NiriLayout", "Toggle clicked!")
              var current = pluginApi.pluginSettings.mode || "center"
              setMode(current === "center" ? "split" : "center")
         }
