@@ -8,8 +8,6 @@ Item {
     id: root
     property var pluginApi: null
 
-    property string internalMode: "center"
-
     readonly property string configBase: Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
     readonly property string configDir: configBase + "/niri"
     readonly property string mainConfig: configDir + "/config.kdl"
@@ -47,9 +45,6 @@ layout {
     Component.onCompleted: {
         Logger.i("NiriLayout", "Plugin Loaded! Starting setup process...")
         setupProcess.running = true
-        if (pluginApi && pluginApi.pluginSettings.mode) {
-             root.internalMode = pluginApi.pluginSettings.mode
-        }
     }
 
     Process {
