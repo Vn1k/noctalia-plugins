@@ -222,6 +222,21 @@
       "lastUpdated": "2026-01-11T11:27:05-05:00"
     },
     {
+      "id": "niri-layout-mode",
+      "name": "Niri Layout Switcher",
+      "version": "1.0.0",
+      "author": "Vinik",
+      "description": "Switch Niri layouts (Center/Split)",
+      "repository": "https://github.com/noctalia-dev/noctalia-plugins",
+      "minNoctaliaVersion": "3.6.0",
+      "license": "MIT",
+      "tags": [
+        "Bar",
+        "System"
+      ],
+      "lastUpdated": "2026-01-21T22:07:09+07:00"
+    },
+    {
       "id": "noctalia-supergfxctl",
       "name": "SuperGFX Control",
       "version": "0.0.3",
