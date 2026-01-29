@@ -12,21 +12,43 @@ Rectangle {
     id: root
     property string currentMode: "center" 
 
-    Component.onCompleted: {
-        console.log("[BarWidget] Loaded! Asking Main.qml for status...")
-        checkStatus.running = true 
+    readonly property string configBase: Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
+    readonly property string configDir: configBase + "/niri"
+    readonly property string layoutConfig: configDir + "/layout.kdl"
+
+    onCurrentModeChanged: {
+        if (currentMode === "split") {
+            statusIcon.icon = "layout-sidebar-right"
+            statusIcon.color = Color.mOnSurface
+            statusText.text = "Split"
+        } else {
+            statusIcon.icon = "focus-2"
+            statusIcon.color = Color.mPrimary
+            statusText.text = "Center"
+        }
+    }
+
+    Timer {
+        interval: 1500
+        running: true
+        repeat: false
+        onTriggered: {
+             Logger.i("NiriDebug", "BarWidget Timer triggered. Requesting status...")
+             checkStatus.running = true
+        }
     }
     
     Process {
         id: checkStatus
-        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "getMode"]
-        
+        command: ["bash", "-c", "grep 'center-focused-column' \"" + root.layoutConfig + "\""]        
         stdout: SplitParser {
             onRead: (data) => {
-                var cleanData = data.trim()
-                if (cleanData === "center" || cleanData === "split") {
-                    root.currentMode = cleanData
-                    console.log("[BarWidget] Synced Initial Mode: " + cleanData)
+                if (data.includes("never")) {
+                    Logger.i("NiriDebug", "File detected: SPLIT mode")
+                    root.currentMode = "split"
+                } else {
+                    Logger.i("NiriDebug", "File detected: CENTER mode")
+                    root.currentMode = "center"
                 }
             }
         }
@@ -34,16 +56,10 @@ Rectangle {
 
     Process {
         id: toggleClick
-        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "toggle"]
+        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "niri-layout-mode", "toggle"]
         
-        stdout: SplitParser {
-            onRead: (data) => {
-                var cleanData = data.trim()
-                if (cleanData === "center" || cleanData === "split") {
-                    root.currentMode = cleanData
-                    console.log("[BarWidget] Click Success! New Mode: " + cleanData)
-                }
-            }
+        stderr: SplitParser {
+            onRead: (data) => Logger.e("NiriDebug", "Toggle IPC Error: " + data)
         }
     }
 
@@ -65,15 +81,17 @@ Rectangle {
         columnSpacing: Style.marginS
 
         NIcon {
+            id: statusIcon 
             Layout.alignment: Qt.AlignCenter
-            icon: root.currentMode === "center" ? "focus-2" : "layout-sidebar-right"
-            color: root.currentMode === "center" ? Color.mPrimary : Color.mOnSurface
+            icon: "focus-2"
+            color: Color.mPrimary
         }
 
         NText {
+            id: statusText  
             visible: !isVertical 
             Layout.alignment: Qt.AlignCenter
-            text: root.currentMode === "center" ? "Center" : "Split"
+            text: "Center"
             color: Color.mOnSurface
             pointSize: Style.fontSizeS
         }
@@ -86,6 +104,13 @@ Rectangle {
         hoverEnabled: true
         onClicked: {
             console.log("[BarWidget] Clicked! Sending command...")
+
+            if (root.currentMode === "center") {
+                root.currentMode = "split"
+            } else {
+                root.currentMode = "center"
+            }
+
             if (!toggleClick.running) toggleClick.running = true
         }
         onEntered: {
