@@ -38,13 +38,10 @@ Rectangle {
         
         stdout: SplitParser {
             onRead: (data) => {
-                console.log("[BarWidget] Raw Response: " + data)
                 var cleanData = data.trim()
                 if (cleanData === "center" || cleanData === "split") {
-                    root.currentMode = cleanData
-                    console.log("[BarWidget] UI Updated to: " + cleanData)
-                } else {
-                    console.warn("[BarWidget] Unknown response: " + cleanData)
+                    root.currentMode = cleanData // <--- INI KUNCINYA! UI berubah disini.
+                    Logger.d("[BarWidget] Click Success! New Mode: " + cleanData)
                 }
             }
         }
