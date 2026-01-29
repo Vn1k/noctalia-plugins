@@ -13,8 +13,9 @@ Rectangle {
     property string currentMode: "center" 
 
     Component.onCompleted: {
-        Logger.d("[BarWidget] Loaded! Asking Main.qml for status...")
+        console.log("[BarWidget] Loaded! Asking Main.qml for status...")
         checkStatus.running = true 
+    }
     
     Process {
         id: checkStatus
@@ -25,7 +26,7 @@ Rectangle {
                 var cleanData = data.trim()
                 if (cleanData === "center" || cleanData === "split") {
                     root.currentMode = cleanData
-                    Logger.d("[BarWidget] Synced Initial Mode: " + cleanData)
+                    console.log("[BarWidget] Synced Initial Mode: " + cleanData)
                 }
             }
         }
@@ -39,8 +40,8 @@ Rectangle {
             onRead: (data) => {
                 var cleanData = data.trim()
                 if (cleanData === "center" || cleanData === "split") {
-                    root.currentMode = cleanData // <--- INI KUNCINYA! UI berubah disini.
-                    Logger.d("[BarWidget] Click Success! New Mode: " + cleanData)
+                    root.currentMode = cleanData
+                    console.log("[BarWidget] Click Success! New Mode: " + cleanData)
                 }
             }
         }
@@ -84,6 +85,7 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         hoverEnabled: true
         onClicked: {
+            console.log("[BarWidget] Clicked! Sending command...")
             if (!toggleClick.running) toggleClick.running = true
         }
         onEntered: {
