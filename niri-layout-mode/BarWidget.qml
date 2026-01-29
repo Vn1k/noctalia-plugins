@@ -12,7 +12,21 @@ Rectangle {
     id: root
 
     property var pluginApi: null
-    readonly property string mode: pluginApi?.pluginSettings?.mode || "center"
+    // LOG 1: Cek apakah setting berhasil dibaca atau default ke center
+    readonly property string mode: {
+        var m = pluginApi?.pluginSettings?.mode || "center"
+        return m
+    }
+
+    // LOGGING SAAT COMPONENT SIAP
+    Component.onCompleted: {
+        console.log("[BarWidget] Loaded!")
+        if (pluginApi) {
+            console.log("[BarWidget] Connected to Plugin API. Current mode: " + mode)
+        } else {
+            console.warn("[BarWidget] WARNING: pluginApi is NULL! (Main.qml might be broken)")
+        }
+    }
 
     readonly property bool isVertical: {
         try {
@@ -57,7 +71,19 @@ Rectangle {
 
     Process {
         id: toggleClick
+        // Command untuk memanggil fungsi toggle di Main.qml
         command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "toggle"]
+        
+        // LOG 2: IPC DEBUGGING
+        // Kalau perintah sukses dijalankan
+        stdout: SplitParser {
+            onRead: (data) => console.log("[BarWidget] IPC Success: " + data)
+        }
+        
+        // Kalau ada error (PENTING!)
+        stderr: SplitParser {
+            onRead: (data) => console.error("[BarWidget] IPC Error: " + data)
+        }
     }
 
     MouseArea {
@@ -65,8 +91,14 @@ Rectangle {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         hoverEnabled: true
+        
         onClicked: {
-            if (!toggleClick.running) toggleClick.running = true
+            console.log("[BarWidget] Clicked! Sending IPC toggle command...")
+            if (!toggleClick.running) {
+                toggleClick.running = true
+            } else {
+                console.log("[BarWidget] Command busy, ignoring click.")
+            }
         }
 
         onEntered: {
