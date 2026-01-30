@@ -17,7 +17,7 @@ Rectangle {
 
     Process {
         id: toggleClick
-        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "niri-layout-mode", "toggle"]
+        command: ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:niri-layout-mode", "toggle"]
     }
 
     implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)

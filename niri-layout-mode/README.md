@@ -42,6 +42,6 @@ The plugin manages a dedicated file at `~/.config/niri/layout.kdl`.
 - **Split Mode:** `center-focused-column "never"`
 
 You can add to your niri keybinds with this command
-`{ spawn "qs" "-c" "noctalia-shell" "ipc" "call" "niri-layout-mode" "toggle"; }`
+`{ spawn "qs" "-c" "noctalia-shell" "ipc" "call" "plugin:niri-layout-mode" "toggle"; }`
 
 _Note: It is recommended NOT to edit `layout.kdl` manually as the plugin overwrites it on state change._

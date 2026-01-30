@@ -85,7 +85,7 @@ Item {
     Process { id: layoutProcess }
 
     IpcHandler {
-        target: "niri-layout-mode"
+        target: "plugin:niri-layout-mode"
 
         function toggle() {
              var current = root.pluginApi ? (root.pluginApi.pluginSettings.mode || "center") : "center"
