@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "Center",
+    "split-status": "Split"
+  },
+  "tooltip": {
+    "center-tooltip": "Center Mode",
+    "split-tooltip": "Split Mode"
+  },
+  "layout": "Layout"
+}

@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "По центру",
+    "split-status": "Розділення"
+  },
+  "tooltip": {
+    "center-tooltip": "Центрований режим",
+    "split-tooltip": "Режим розділення"
+  },
+  "layout": "Макет"
+}

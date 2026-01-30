@@ -46,7 +46,13 @@ Rectangle {
         NText {
             visible: !isVertical 
             Layout.alignment: Qt.AlignCenter
-            text: root.mode === "center" ? "Center" : "Split"
+            text: {
+                let key = root.mode === "center" ? "widget.center-status" : "widget.split-status";
+                let fallback = root.mode === "center" ? "Center" : "Split";
+                let translated = pluginApi?.tr(key);
+                
+                return (translated && !translated.startsWith("!!")) ? translated : fallback;
+            }
             color: Color.mOnSurface
             pointSize: Style.fontSizeS
         }
@@ -62,7 +68,16 @@ Rectangle {
         }
         onEntered: {
             if (root.isVertical) {
-                TooltipService.show(root, root.mode === "center" ? "Center Mode" : "Split Mode", BarService.getTooltipDirection())
+                let tooltipText = "";
+                if (root.mode === "center") {
+                    let translated = pluginApi?.tr("tooltip.center-tooltip");
+                    tooltipText = (translated && !translated.startsWith("!!")) ? translated : "Center Mode";
+                } else {
+                    let translated = pluginApi?.tr("tooltip.split-tooltip");
+                    tooltipText = (translated && !translated.startsWith("!!")) ? translated : "Split Mode";
+                }
+
+                TooltipService.show(root, tooltipText, BarService.getTooltipDirection())
             }
         }
         onExited: TooltipService.hide()

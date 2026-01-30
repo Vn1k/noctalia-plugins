@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "Gecentreerd",
+    "split-status": "Gesplitst"
+  },
+  "tooltip": {
+    "center-tooltip": "Gecentreerde Modus",
+    "split-tooltip": "Gesplitste Modus"
+  },
+  "layout": "Indeling"
+}

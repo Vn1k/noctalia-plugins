@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "Centrato",
+    "split-status": "Diviso"
+  },
+  "tooltip": {
+    "center-tooltip": "Modalità Centrata",
+    "split-tooltip": "Modalità Divisa"
+  },
+  "layout": "Disposizione"
+}

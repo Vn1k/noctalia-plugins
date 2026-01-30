@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "居中",
+    "split-status": "分屏"
+  },
+  "tooltip": {
+    "center-tooltip": "居中模式",
+    "split-tooltip": "分屏模式"
+  },
+  "layout": "布局"
+}

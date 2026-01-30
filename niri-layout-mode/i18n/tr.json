@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "Ortalanmış",
+    "split-status": "Bölünmüş"
+  },
+  "tooltip": {
+    "center-tooltip": "Orta Mod",
+    "split-tooltip": "Bölünmüş Mod"
+  },
+  "layout": "Düzen"
+}

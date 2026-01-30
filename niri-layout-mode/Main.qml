@@ -13,16 +13,25 @@ Item {
     readonly property string mainConfig: configDir + "/config.kdl"
     readonly property string layoutConfig: configDir + "/layout.kdl"
 
+    function getTranslation(key, fallback) {
+        var res = pluginApi?.tr(key);
+        return (res && !res.startsWith("!!")) ? res : fallback;
+    }
+
     function setMode(modeName) {
         if (!root.pluginApi) return
 
         var targetMode = modeName.toLowerCase()
         var centerVal = "always"
-        var label = "Center Mode"
+        var label = getTranslation(
+            targetMode === "split" ? "tooltip.split-tooltip" : "tooltip.center-tooltip",
+            targetMode === "split" ? "Split Mode" : "Center Mode"
+        );
+
+        var layoutLabel = getTranslation("layout", "Layout");
 
         if (targetMode === "split") {
             centerVal = "never"
-            label = "Split Mode"
         } 
 
         // 1. Update File Config Niri
@@ -36,7 +45,7 @@ Item {
         root.pluginApi.pluginSettings.mode = targetMode
         root.pluginApi.saveSettings()
         
-        ToastService.showNotice("Layout: " + label)
+        ToastService.showNotice(layoutLabel + ": " + label)
     }
 
     readonly property string installScript: `

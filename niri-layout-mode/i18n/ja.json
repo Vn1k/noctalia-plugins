@@ -1,0 +1,11 @@
+{
+  "widget": {
+    "center-status": "センター",
+    "split-status": "スプリット"
+  },
+  "tooltip": {
+    "center-tooltip": "センターモード",
+    "split-tooltip": "スプリットモード"
+  },
+  "layout": "レイアウト"
+}
