@@ -10,57 +10,14 @@ import qs.Services.System
 
 Rectangle {
     id: root
-    property string currentMode: "center" 
-
-    readonly property string configBase: Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
-    readonly property string configDir: configBase + "/niri"
-    readonly property string layoutConfig: configDir + "/layout.kdl"
-
-    onCurrentModeChanged: {
-        if (currentMode === "split") {
-            statusIcon.icon = "layout-sidebar-right"
-            statusIcon.color = Color.mOnSurface
-            statusText.text = "Split"
-        } else {
-            statusIcon.icon = "focus-2"
-            statusIcon.color = Color.mPrimary
-            statusText.text = "Center"
-        }
-    }
-
-    Timer {
-        interval: 1500
-        running: true
-        repeat: false
-        onTriggered: {
-             Logger.i("NiriDebug", "BarWidget Timer triggered. Requesting status...")
-             checkStatus.running = true
-        }
-    }
     
-    Process {
-        id: checkStatus
-        command: ["bash", "-c", "grep 'center-focused-column' \"" + root.layoutConfig + "\""]        
-        stdout: SplitParser {
-            onRead: (data) => {
-                if (data.includes("never")) {
-                    Logger.i("NiriDebug", "File detected: SPLIT mode")
-                    root.currentMode = "split"
-                } else {
-                    Logger.i("NiriDebug", "File detected: CENTER mode")
-                    root.currentMode = "center"
-                }
-            }
-        }
-    }
+    property var pluginApi: null
+
+    readonly property string mode: pluginApi?.pluginSettings?.mode || "center"
 
     Process {
         id: toggleClick
         command: ["qs", "-c", "noctalia-shell", "ipc", "call", "niri-layout-mode", "toggle"]
-        
-        stderr: SplitParser {
-            onRead: (data) => Logger.e("NiriDebug", "Toggle IPC Error: " + data)
-        }
     }
 
     implicitWidth: isVertical ? Style.capsuleHeight : (layout.implicitWidth + Style.marginM * 2)
@@ -81,17 +38,15 @@ Rectangle {
         columnSpacing: Style.marginS
 
         NIcon {
-            id: statusIcon 
             Layout.alignment: Qt.AlignCenter
-            icon: "focus-2"
-            color: Color.mPrimary
+            icon: root.mode === "center" ? "focus-2" : "layout-sidebar-right"
+            color: root.mode === "center" ? Color.mPrimary : Color.mOnSurface
         }
 
         NText {
-            id: statusText  
             visible: !isVertical 
             Layout.alignment: Qt.AlignCenter
-            text: "Center"
+            text: root.mode === "center" ? "Center" : "Split"
             color: Color.mOnSurface
             pointSize: Style.fontSizeS
         }
@@ -103,19 +58,11 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         hoverEnabled: true
         onClicked: {
-            console.log("[BarWidget] Clicked! Sending command...")
-
-            if (root.currentMode === "center") {
-                root.currentMode = "split"
-            } else {
-                root.currentMode = "center"
-            }
-
             if (!toggleClick.running) toggleClick.running = true
         }
         onEntered: {
             if (root.isVertical) {
-                TooltipService.show(root, root.currentMode === "center" ? "Center Mode" : "Split Mode", BarService.getTooltipDirection())
+                TooltipService.show(root, root.mode === "center" ? "Center Mode" : "Split Mode", BarService.getTooltipDirection())
             }
         }
         onExited: TooltipService.hide()
