@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# install.sh — Hanzi Lookup Setup Script (Optimized for Fedora)
+# install.sh — Hanzi Lookup Setup Script (Optimized for Fedora + GPU)
 # ============================================================
 
 set -e
@@ -21,7 +21,6 @@ step()    { echo -e "\n${CYAN}══ $* ══${NC}"; }
 
 # ─── Direktori ───────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Jika script di dalam folder 'scripts/', maka project dir adalah satu level di atasnya
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 DATA_DIR="$HOME/.local/share/hanzi-lookup"
@@ -35,10 +34,9 @@ CEDICT_FILE="$DATA_DIR/cedict_ts.u8"
 # ─── Step 1: Dependensi sistem ───────────────────────────────────────────────
 step "Step 1: Install dependensi sistem"
 
-info "Mengecek paket Fedora..."
-# Fedora menggunakan chi_sim (underscore) bukan chi-sim (hyphen)
+info "Mengecek paket Fedora (grim, slurp)..."
 MISSING_PACKAGES=()
-for pkg in grim slurp tesseract tesseract-langpack-chi_sim; do
+for pkg in grim slurp; do
     if ! rpm -q "$pkg" &>/dev/null 2>&1; then
         MISSING_PACKAGES+=("$pkg")
     fi
@@ -51,13 +49,18 @@ else
     success "Dependensi sistem sudah terpenuhi"
 fi
 
-# ─── Step 2: Dependensi Python ───────────────────────────────────────────────
-step "Step 2: Install dependensi Python"
+# ─── Step 2: Dependensi Python & GPU ─────────────────────────────────────────
+step "Step 2: Install dependensi Python (CnOCR + GPU)"
 
-info "Mengupdate pytesseract dan Pillow..."
-# Menggunakan --upgrade untuk memastikan versi terbaru di Python 3.14
-pip3 install --upgrade pytesseract pillow --break-system-packages --quiet
-success "Dependensi Python OK"
+info "Menginstall CnOCR dengan dukungan ONNX Runtime GPU..."
+# Menggunakan extra [ort-gpu] untuk dukungan CUDA
+pip3 install --upgrade "cnocr[ort-gpu]" onnxruntime-gpu pillow requests --break-system-packages --quiet
+
+if nvidia-smi &>/dev/null; then
+    success "NVIDIA GPU terdeteksi, dukungan CUDA siap digunakan."
+else
+    warn "NVIDIA GPU tidak terdeteksi atau driver belum terpasang. CnOCR akan berjalan di CPU."
+fi
 
 # ─── Step 3: Direktori ──────────────────────────────────────────────────────
 step "Step 3: Menyiapkan direktori"
@@ -68,7 +71,6 @@ success "Struktur direktori siap"
 # ─── Step 4: Database CC-CEDICT ──────────────────────────────────────────────
 step "Step 4: Download & Extract Database"
 
-# Hapus file lama jika korup (0 bytes)
 [ -f "$CEDICT_FILE" ] && [ ! -s "$CEDICT_FILE" ] && rm "$CEDICT_FILE"
 
 if [ ! -f "$CEDICT_FILE" ]; then
@@ -76,10 +78,8 @@ if [ ! -f "$CEDICT_FILE" ]; then
     curl -L -o "$CEDICT_GZ" "$CEDICT_URL"
     
     info "Mengekstrak database..."
-    # gunzip akan menghasilkan file bernama cedict.txt jika inputnya cedict.txt.gz
     gunzip -f "$CEDICT_GZ"
     
-    # Cari file hasil ekstrak (biasanya cedict.txt atau nama asli dari MDBG)
     EXTRACTED_FILE=$(ls "$DATA_DIR"/cedict* | grep -v ".log" | head -n 1)
     
     if [ -f "$EXTRACTED_FILE" ]; then
@@ -95,24 +95,25 @@ fi
 # ─── Step 5: Install Script ──────────────────────────────────────────────────
 step "Step 5: Deploy Python Script"
 
+# Prioritas: gunakan file di direktori saat ini atau folder proyek
+TARGET_SCRIPT=""
 if [ -f "$SCRIPT_DIR/hanzi-lookup.py" ]; then
-    cp "$SCRIPT_DIR/hanzi-lookup.py" "$BIN_DIR/hanzi-lookup.py"
+    TARGET_SCRIPT="$SCRIPT_DIR/hanzi-lookup.py"
+elif [ -f "$PROJECT_DIR/hanzi-lookup.py" ]; then
+    TARGET_SCRIPT="$PROJECT_DIR/hanzi-lookup.py"
+fi
+
+if [ -n "$TARGET_SCRIPT" ]; then
+    cp "$TARGET_SCRIPT" "$BIN_DIR/hanzi-lookup.py"
     chmod +x "$BIN_DIR/hanzi-lookup.py"
     success "Script terpasang di $BIN_DIR"
 else
-    # Jika dijalankan dari root project, bukan dari folder scripts
-    if [ -f "$PROJECT_DIR/hanzi-lookup.py" ]; then
-        cp "$PROJECT_DIR/hanzi-lookup.py" "$BIN_DIR/hanzi-lookup.py"
-        chmod +x "$BIN_DIR/hanzi-lookup.py"
-    else
-        warn "hanzi-lookup.py tidak ditemukan di $SCRIPT_DIR"
-    fi
+    error "hanzi-lookup.py tidak ditemukan!"
 fi
 
 # ─── Step 6: Noctalia Plugin ─────────────────────────────────────────────────
 step "Step 6: Deploy Noctalia Plugin"
 
-# Mencoba mencari folder 'plugin' di root project
 if [ -d "$PROJECT_DIR/plugin" ]; then
     cp -r "$PROJECT_DIR/plugin/"* "$PLUGIN_DIR/"
     success "Plugin disalin ke $PLUGIN_DIR"
@@ -120,23 +121,27 @@ else
     warn "Sumber plugin tidak ditemukan di $PROJECT_DIR/plugin"
 fi
 
-# ─── Step 7: Verifikasi Akhir ────────────────────────────────────────────────
+# ─── Step 7: Verifikasi Final ────────────────────────────────────────────────
 step "Step 7: Verifikasi Final"
 
+# Cek Database
 ENTRY_COUNT=$(grep -v "^#" "$CEDICT_FILE" | wc -l || echo "0")
 if [ "$ENTRY_COUNT" -gt 100000 ]; then
     success "Database Valid: $ENTRY_COUNT entri ditemukan"
 else
-    error "Database tidak valid atau kosong. Silakan cek $CEDICT_FILE"
+    error "Database tidak valid atau kosong di $CEDICT_FILE"
 fi
 
-if tesseract --list-langs | grep -q "chi_sim"; then
-    success "OCR Mandarin (chi_sim) tersedia"
+# Cek CnOCR
+info "Mengetes inisialisasi CnOCR..."
+if python3 -c "from cnocr import CnOcr; CnOcr(context='cpu')" &>/dev/null; then
+    success "CnOCR Engine siap digunakan"
 else
-    error "OCR Mandarin tidak ditemukan di Tesseract"
+    error "Gagal menginisialisasi CnOCR. Cek instalasi Python."
 fi
 
 echo -e "\n${GREEN}════════════════════════════════════════${NC}"
 echo -e "${GREEN}        SETUP SELESAI!${NC}"
 echo -e "${GREEN}════════════════════════════════════════${NC}"
-echo -e "Silakan aktifkan plugin di Noctalia dan tambahkan keybind di Niri."
+echo -e "CnOCR telah diatur untuk menggunakan GPU secara default."
+echo -e "Silakan aktifkan plugin di Noctalia untuk mulai menggunakan."
