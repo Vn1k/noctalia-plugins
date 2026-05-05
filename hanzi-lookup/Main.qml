@@ -46,6 +46,19 @@ Item {
          *   ]
          * }
          */
+
+        function updateAIText(jsonData: string) {
+            if (!pluginApi) return
+            try {
+                let parsed = JSON.parse(jsonData)
+                // Simpan ke settings agar QML otomatis merefresh UI
+                pluginApi.pluginSettings.aiTranslation = parsed.ai_text
+                pluginApi.saveSettings()
+            } catch (e) {
+                Logger.e("HanziLookup", "Gagal parse teks AI:", e.toString())
+            }
+        }
+
         function showResult(jsonData: string) {
             if (!pluginApi) {
                 Logger.e("HanziLookup", "pluginApi tidak tersedia saat showResult dipanggil")

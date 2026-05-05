@@ -70,6 +70,49 @@ Item {
                 }
             }
 
+            NText {
+                visible: root.results.length > 0
+                
+                // Logika penggabungan Pinyin
+                text: {
+                    let pinyinArray = []
+                    for (let i = 0; i < root.results.length; i++) {
+                        let res = root.results[i]
+                        // Ambil pinyin dari entri pertama jika ada, jika tidak, tampilkan hanzi-nya
+                        if (res.entries && res.entries.length > 0 && res.entries[0].pinyin) {
+                            pinyinArray.push(res.entries[0].pinyin)
+                        } else {
+                            pinyinArray.push(res.hanzi) 
+                        }
+                    }
+                    return pinyinArray.join("  ") // Gabungkan dengan 2 spasi agar lega
+                }
+                
+                pointSize: Style.fontSizeL
+                color: Color.mPrimary
+                font.italic: true
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                
+                // Margin agar posisinya pas di bawah teks "结果..."
+                Layout.topMargin: -Style.marginM 
+                Layout.bottomMargin: Style.marginS
+            }
+
+            NText {
+                visible: root.results.length > 0
+                
+                text: pluginApi.pluginSettings.aiTranslation || "Load AI translation..."
+                
+                pointSize: Style.fontSizeM
+                color: Color.mOnSurfaceVariant  // Warna redup agar minimalis
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                
+                Layout.topMargin: -Style.marginS
+                Layout.bottomMargin: Style.marginM
+            }
+
             // Divider
             Rectangle {
                 Layout.fillWidth: true

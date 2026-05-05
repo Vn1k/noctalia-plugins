@@ -30,6 +30,8 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Optional
+import requests
+import threading
 
 # ─── Konfigurasi ────────────────────────────────────────────────────────────
 
@@ -336,6 +338,25 @@ def run_ocr(image_path: str) -> Optional[str]:
         except Exception:
             pass
 
+# AI
+
+def get_ai_translation(text, ipc_target):
+    # Prompt ringkas agar AI tidak bertele-tele dan cepat merespons
+    prompt = f"Translate this Chinese text to English naturally: {text}. Output ONLY the translation."
+    
+    try:
+        # Panggil Ollama API secara lokal
+        response = requests.post('http://localhost:11434/api/generate', json={
+            "model": "qwen2.5:1.5b-instruct",
+            "prompt": prompt,
+            "stream": False
+        })
+        ai_text = response.json().get("response", "").strip()
+        
+        payload = json.dumps({"ai_text": ai_text}, ensure_ascii=False)
+        subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", ipc_target, "updateAIText", payload])
+    except Exception as e:
+        pass
 
 # ─── IPC + Notifikasi ────────────────────────────────────────────────────────
 
@@ -432,6 +453,7 @@ def main():
             sys.exit(1)
 
     # Lookup di dictionary
+    threading.Thread(target=get_ai_translation, args=(hanzi_text, IPC_TARGET), daemon=True).start()
     results = lookup_hanzi(hanzi_text, dictionary)
 
     if not results:
