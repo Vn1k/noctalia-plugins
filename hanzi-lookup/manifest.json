@@ -7,7 +7,7 @@
   "license": "MIT",
   "tags": ["Chinese", "Language", "Ocr"],
 
-  "components": {
+  "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
     "controlCenterWidget": "ControlCenterWidget.qml"
