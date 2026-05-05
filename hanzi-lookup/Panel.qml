@@ -93,6 +93,7 @@ Item {
                 Layout.fillHeight: true
                 visible: root.results.length > 0
 
+
                 ListView {
                     id: listView
                     model: root.results
@@ -100,7 +101,10 @@ Item {
                     clip: true
 
                     delegate: Rectangle {
+                        id: resultContainer
                         width: listView.width
+                        property var resultData: modelData 
+                        
                         height: cardContent.implicitHeight + Style.marginL * 2
                         color: Color.mSurfaceVariant
                         radius: Style.radiusL
@@ -112,108 +116,67 @@ Item {
                                 left: parent.left
                                 right: parent.right
                                 margins: Style.marginL
-                                topMargin: Style.marginM
                             }
                             spacing: Style.marginS
 
-                            // Baris atas: Hanzi besar + pinyin
+                            // ── Baris Hanzi & Pinyin ──
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: Style.marginM
-
-                                // Hanzi
                                 NText {
-                                    text: modelData.hanzi || "?"
-                                    pointSize: Style.fontSizeXXL * 1.5
-                                    font.weight: Font.Medium
+                                    text: resultData.hanzi || "?"
+                                    pointSize: Style.fontSizeXXL
                                     color: Color.mOnSurface
                                 }
-
-                                ColumnLayout {
+                                
+                                NText {
+                                    // Ambil pinyin dari entri pertama
+                                    text: (resultData.entries?.length > 0) ? resultData.entries[0].pinyin : ""
+                                    pointSize: Style.fontSizeL
+                                    color: Color.mPrimary
                                     Layout.fillWidth: true
-                                    spacing: Style.marginXS
-
-                                    // Pinyin
-                                    NText {
-                                        visible: (modelData.entries?.length ?? 0) > 0
-                                        text: modelData.entries?.[0]?.pinyin ?? ""
-                                        pointSize: Style.fontSizeL
-                                        font.weight: Font.Medium
-                                        color: Color.mPrimary
-                                    }
-
-                                    // Tradisional (hanya jika beda)
-                                    NText {
-                                        visible: {
-                                            let t = modelData.entries?.[0]?.traditional ?? ""
-                                            return t && t !== modelData.hanzi
-                                        }
-                                        text: "繁: " + (modelData.entries?.[0]?.traditional ?? "")
-                                        pointSize: Style.fontSizeS
-                                        color: Color.mOnSurfaceVariant
-                                    }
                                 }
                             }
 
-                            // Tidak ditemukan
-                            NText {
-                                visible: (modelData.entries?.length ?? 0) === 0
-                                text: "Tidak ditemukan di kamus"
-                                pointSize: Style.fontSizeS
-                                color: Color.mOnSurfaceVariant
-                                font.italic: true
-                            }
-
-                            // Arti-arti
+                            // ── List Entri (Repeater Pertama) ──
                             Repeater {
-                                model: modelData.entries ?? []
-
-                                ColumnLayout {
+                                model: resultData.entries || []
+                                delegate: ColumnLayout {
+                                    id: entryItem
                                     Layout.fillWidth: true
-                                    spacing: Style.marginXS
+                                    // Alias untuk data entri saat ini
+                                    property var entryData: modelData 
 
-                                    // Pinyin alternatif (entry ke-2 dst)
-                                    NText {
-                                        visible: index > 0
-                                        text: modelData.pinyin ?? ""
-                                        pointSize: Style.fontSizeS
-                                        color: Color.mPrimary
-                                        font.italic: true
-                                    }
-
-                                    // Meanings
+                                    // ── List Arti (Repeater Kedua) ──
                                     Repeater {
-                                        model: modelData.meanings?.slice(0, 5) ?? []
-
-                                        RowLayout {
+                                        model: entryData.meanings || []
+                                        delegate: RowLayout {
                                             Layout.fillWidth: true
                                             spacing: Style.marginS
 
                                             NText {
                                                 text: (index + 1) + "."
-                                                pointSize: Style.fontSizeM
                                                 color: Color.mOnSurfaceVariant
                                                 Layout.preferredWidth: 20
                                             }
 
                                             NText {
+                                                // Di sini modelData adalah string arti yang aman
                                                 text: modelData
-                                                pointSize: Style.fontSizeM
-                                                color: Color.mOnSurface
-                                                wrapMode: Text.WordWrap
                                                 Layout.fillWidth: true
+                                                wrapMode: Text.WordWrap
+                                                color: Color.mOnSurface
                                             }
                                         }
                                     }
 
-                                    // Divider antar entry
+                                    // Divider jika ada lebih dari satu entri
                                     Rectangle {
-                                        visible: index < (cardContent.parent?.entries?.length ?? 1) - 1
+                                        visible: index < (resultData.entries.length - 1)
                                         Layout.fillWidth: true
                                         height: 1
                                         color: Color.mOutline
                                         opacity: 0.2
-                                        Layout.topMargin: Style.marginXS
+                                        Layout.topMargin: Style.marginS
                                     }
                                 }
                             }
