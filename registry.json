@@ -222,6 +222,20 @@
       "lastUpdated": "2026-01-11T11:27:05-05:00"
     },
     {
+      "id": "hanzi-lookup",
+      "name": "Hanzi lookup",
+      "version": "1.0.0",
+      "author": "Vinik",
+      "description": "Capture hanzi & translate to english",
+      "repository": "https://github.com/noctalia-dev/noctalia-plugins",
+      "minNoctaliaVersion": "3.6.0",
+      "license": "MIT",
+      "tags": [
+        "Chinese", "Language", "Ocr"
+      ],
+      "lastUpdated": "2026-05-05T22:07:09+07:00"
+    },
+    {
       "id": "niri-layout-mode",
       "name": "Niri Layout Switcher",
       "version": "1.0.0",

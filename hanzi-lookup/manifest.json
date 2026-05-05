@@ -1,0 +1,25 @@
+{
+  "id": "hanzi-lookup",
+  "name": "Hanzi Lookup",
+  "description": "Lookup pinyin dan arti Hanzi simplified Chinese dari screenshot area layar",
+  "version": "1.0.0",
+  "author": "kamu",
+  "license": "MIT",
+  "tags": ["Chinese", "Language", "Ocr"],
+
+  "components": {
+    "main": "Main.qml",
+    "panel": "Panel.qml",
+    "controlCenterWidget": "ControlCenterWidget.qml"
+  },
+
+  "defaultSettings": {
+    "maxResults": 10,
+    "showTraditional": true,
+    "showPinyin": true,
+    "panelWidth": 480,
+    "lastQuery": "",
+    "lastResults": "[]",
+    "hasResults": false
+  }
+}
