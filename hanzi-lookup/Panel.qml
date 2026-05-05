@@ -23,6 +23,7 @@ Item {
     property var results: []
     property string queryText: ""
     property string currentMode: "OCR"
+    property string fullPinyin: ""
     
     // New State for My Dictionary (Favorites)
     property bool showSavedOnly: false
@@ -37,6 +38,7 @@ Item {
             root.queryText = parsed.query || ""
             root.results   = parsed.results || []
             root.currentMode = pluginApi.pluginSettings.lastMode || "OCR"
+            root.fullPinyin  = pluginApi.pluginSettings.lastPinyin || ""
         } catch (e) {
             Logger.e("HanziLookup/Panel", "Parse error:", e.toString())
         }
@@ -163,19 +165,7 @@ Item {
             NText {
                 visible: !root.showSavedOnly && root.results.length > 0
                 
-                text: {
-                    let pinyinArray = []
-                    for (let i = 0; i < root.results.length; i++) {
-                        let res = root.results[i]
-                        if (res.entries && res.entries.length > 0 && res.entries[0].pinyin) {
-                            pinyinArray.push(res.entries[0].pinyin)
-                        } else {
-                            pinyinArray.push(res.hanzi) 
-                        }
-                    }
-                    return pinyinArray.join("  ") 
-                }
-                
+                text: root.fullPinyin
                 pointSize: Style.fontSizeL
                 color: Color.mPrimary
                 font.italic: true

@@ -3,6 +3,21 @@ import sys
 import requests
 import subprocess
 import re
+import subprocess
+import json
+
+def get_noctalia_settings():
+    """Mengambil konfigurasi plugin dari Noctalia"""
+    try:
+        result = subprocess.run(
+            ["qs", "-c", "noctalia-shell", "plugin", "settings", "hanzi-lookup"],
+            capture_output=True, text=True, timeout=2
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+    except Exception:
+        pass
+    return {}
 
 def main():
     if len(sys.argv) < 2:
@@ -33,9 +48,12 @@ def main():
         "noise_scale_w": 0.8
     }
 
+    settings = get_noctalia_settings()
+    melo_url = settings.get("meloUrl", "http://127.0.0.1:8888/tts/convert/tts")
+
     try:
         # Kirim request ke container MeloTTS local Anda (Port 8888)
-        r = requests.post("http://127.0.0.1:8888/tts/convert/tts", json=payload, stream=True)
+        r = requests.post(melo_url, json=payload, stream=True)
         r.raise_for_status()
 
         # Gunakan pw-play (bawaan Fedora/Pipewire) untuk memutar stream WAV langsung

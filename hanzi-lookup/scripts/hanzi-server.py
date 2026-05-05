@@ -61,11 +61,13 @@ def main():
                         threading.Thread(target=get_ai_translation, args=(final_text, IPC_TARGET)).start()
                     
                     # Lookup kamus CC-CEDICT dan kirim ke Noctalia
-                    results = lookup_hanzi(final_text, dictionary)
-                    if results:
+                    cards, full_pinyin = lookup_hanzi(final_text, dictionary)
+
+                    if cards or full_pinyin:                         
                         payload = json.dumps({
                             "query": final_text, 
-                            "results": results, 
+                            "results": cards, 
+                            "pinyin": full_pinyin, 
                             "mode": "OCR" if is_text_mode else "OBJ"
                         }, ensure_ascii=False)
                         

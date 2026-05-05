@@ -84,6 +84,7 @@ Item {
 
             // Save to settings
             pluginApi.pluginSettings.lastMode    = parsed.mode || "OCR"
+            pluginApi.pluginSettings.lastPinyin  = parsed.pinyin || ""
             
             // If it's an object, hide the AI loading text. If OCR, show loading.
             pluginApi.pluginSettings.aiTranslation = (parsed.mode === "OBJ") ? "" : "Loading AI translation..."

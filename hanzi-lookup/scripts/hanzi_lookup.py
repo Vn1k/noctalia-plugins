@@ -48,6 +48,21 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+def get_noctalia_settings():
+    """Mengambil semua pengaturan plugin dari Noctalia secara dinamis"""
+    try:
+        # Menjalankan perintah IPC Noctalia untuk mengambil settings
+        result = subprocess.run(
+            ["qs", "-c", "noctalia-shell", "plugin", "settings", "hanzi-lookup"],
+            capture_output=True, text=True, timeout=2
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+    except Exception as e:
+        print(f"Gagal mengambil settings: {e}")
+    
+    # Return default jika gagal
+    return {}
 # ─── CC-CEDICT Parser ────────────────────────────────────────────────────────
 
 def load_cedict(path: Path) -> dict:
@@ -136,23 +151,28 @@ def _apply_tone(syllable: str, tone: int) -> str:
 
 # ─── Lookup ─────────────────────────────────────────────────────────────────
 
-def lookup_hanzi(text: str, dictionary: dict) -> list[dict]:
+def lookup_hanzi(text: str, dictionary: dict) -> tuple[list[dict], str]:
     text = text.strip()
     if not text:
-        return []
+        return [], ""
 
-    cjk_only = re.sub(r'[^\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df]', ' ', text)
-    chunks = cjk_only.split()
-
-    if not chunks:
-        log.warning(f"Tidak ada karakter CJK ditemukan dalam: {repr(text)}")
-        return []
-
-    results = []
+    # 1. Regex disempurnakan: Menangkap Hanzi, Alfanumerik, DAN Tanda Baca (mengabaikan spasi kosong)
+    regex_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df]+|[a-zA-Z0-9]+|[^\sa-zA-Z0-9\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df]+'
+    tokens = re.findall(regex_pattern, text)
+    
+    cards = []
     seen = set()
+    pinyin_parts = []
     chars_processed = 0
 
-    for chunk in chunks:
+    for token in tokens:
+        # Jika token BUKAN Hanzi (Berarti kata Inggris, Angka, atau Tanda Baca)
+        if not re.match(r'^[\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df]+$', token):
+            pinyin_parts.append(token) # Masukkan langsung ke kalimat Pinyin tanpa lookup kamus
+            continue
+
+        # Jika token adalah Hanzi, lakukan pemotongan dan pencarian kamus
+        chunk = token
         n = len(chunk)
         i = 0
         
@@ -161,11 +181,14 @@ def lookup_hanzi(text: str, dictionary: dict) -> list[dict]:
             for j in range(n, i, -1):
                 word = chunk[i:j]
                 if word in dictionary:
+                    # Tambahkan pinyin ke kalimat utuh
+                    pinyin_parts.append(dictionary[word][0]["pinyin"])
+                    
+                    # Tambahkan ke daftar kartu hasil (hanya jika belum ada)
                     if word not in seen:
-                        entries = dictionary[word]
-                        results.append({
+                        cards.append({
                             "hanzi": word,
-                            "entries": entries[:3],
+                            "entries": dictionary[word][:3],
                             "is_phrase": len(word) > 1
                         })
                         seen.add(word)
@@ -177,19 +200,33 @@ def lookup_hanzi(text: str, dictionary: dict) -> list[dict]:
             
             if not matched:
                 char = chunk[i]
-                if char not in seen:
-                    entries = dictionary.get(char, [])
-                    if entries:
-                        results.append({
+                entries = dictionary.get(char, [])
+                if entries:
+                    pinyin_parts.append(entries[0]["pinyin"])
+                    if char not in seen:
+                        cards.append({
                             "hanzi": char,
                             "entries": entries[:3],
                             "is_phrase": False
                         })
-                    seen.add(char)
+                        seen.add(char)
+                else:
+                    # Jika karakter aneh/Hanzi langka tidak ada di kamus
+                    pinyin_parts.append(char)
+                
                 i += 1
                 chars_processed += 1
 
-    return results
+    # 2. Rapikan spasi agar UI terlihat cantik
+    raw_pinyin = " ".join(pinyin_parts)
+    
+    # Hapus spasi berlebih sebelum tanda baca (contoh: "wǒ ，" jadi "wǒ，")
+    clean_pinyin = re.sub(r'\s+([,.:;!?。，！？、》”\]）])', r'\1', raw_pinyin)
+    # Hapus spasi berlebih sesudah tanda kurung buka/kutip
+    clean_pinyin = re.sub(r'([《“\[（])\s+', r'\1', clean_pinyin)
+    
+    # Return Tuple: (Daftar Kartu Kamus, String Kalimat Pinyin)
+    return cards, clean_pinyin.strip()
 
 
 # ─── Screenshot + CnOCR ─────────────────────────────────────────────────────
@@ -242,12 +279,12 @@ def get_ocr():
         from cnocr import CnOcr
         try:
             # Coba jalankan di GPU (CUDA)
-            _ocr_instance = CnOcr(context='cuda', det_model_name=None)
+            _ocr_instance = CnOcr(context='cuda', det_model_name='naive_det')
             log.info("CnOCR berhasil dimuat menggunakan GPU (CUDA).")
         except Exception as e:
             log.warn(f"Gagal memuat GPU ({e}), beralih ke CPU.")
             # Fallback otomatis ke CPU jika CUDA gagal
-            _ocr_instance = CnOcr(context='cpu', det_model_name=None)
+            _ocr_instance = CnOcr(context='cpu', det_model_name='naive_det')
     return _ocr_instance
 
 def run_ocr(image_path: str) -> Optional[str]:
@@ -287,10 +324,13 @@ def run_ocr(image_path: str) -> Optional[str]:
 # ─── AI Translation ─────────────────────────────────────────────────────────
 
 def get_ai_translation(text, ipc_target):
+    settings = get_noctalia_settings()
+    url = settings.get("ollamaUrl", "http://localhost:11434/api/generate")
+    model = settings.get("ollamaModel", "qwen2.5:1.5b-instruct")
     prompt = f"Translate this Chinese text to English naturally: {text}. Output ONLY the translation."
     try:
-        response = requests.post('http://localhost:11434/api/generate', json={
-            "model": "qwen2.5:1.5b-instruct",
+        response = requests.post(url, json={
+            "model": model,
             "prompt": prompt,
             "stream": False
         })
@@ -309,8 +349,10 @@ def get_yolo():
     """Lazy-load instance YOLOv8 agar memori tidak penuh jika belum dipakai"""
     global _yolo_instance
     if _yolo_instance is None:
+        settings = get_noctalia_settings()
+        model_name = settings.get("yoloModel", "yolo11s.pt")
         log.info("Memuat model YOLO...")
-        _yolo_instance = YOLO("yolo11s.pt")
+        _yolo_instance = YOLO(model_name)
     return _yolo_instance
 
 # ─── Object Translation (Ollama) ────────────────────────────────────────────

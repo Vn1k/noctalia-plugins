@@ -10,7 +10,8 @@
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
-    "controlCenterWidget": "ControlCenterWidget.qml"
+    "controlCenterWidget": "ControlCenterWidget.qml",
+    "settings": "Settings.qml"
   },
 
   "defaultSettings": {
