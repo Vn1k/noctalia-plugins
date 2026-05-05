@@ -1,16 +1,3 @@
-/**
- * Panel.qml — Hanzi Lookup Display Panel
- *
- * Panel overlay yang menampilkan hasil lookup Hanzi:
- *   - Karakter Hanzi besar
- *   - Pinyin dengan tone marks
- *   - Arti dalam bahasa Inggris/Indonesia
- *   - Karakter tradisional (opsional)
- *
- * Panel membaca data dari pluginApi.pluginSettings.lastResults
- * yang sudah diset oleh Main.qml ketika menerima IPC call.
- */
-
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -22,276 +9,215 @@ Item {
 
     property var pluginApi: null
 
-    // Minimal ukuran panel
-    implicitWidth:  pluginApi?.pluginSettings?.panelWidth ?? 480
-    implicitHeight: Math.min(600, contentColumn.implicitHeight + 48)
+    // ─── Wajib untuk sistem panel Noctalia ───────────────────────────────────
+    readonly property var geometryPlaceholder: panelContainer
+    readonly property bool allowAttach: true
 
-    // ─── Data Binding ─────────────────────────────────────────────────────────
+    property real contentPreferredWidth:  480 * Style.uiScaleRatio
+    property real contentPreferredHeight: 540 * Style.uiScaleRatio
 
-    // Parse hasil dari JSON string saat settings berubah
-    property var parsedData: ({query: "", results: []})
+    anchors.fill: parent
 
-    Connections {
-        target: pluginApi?.pluginSettings ?? null
-        function onLastResultsChanged() {
-            root.reloadData()
-        }
-    }
-
-    Component.onCompleted: {
-        reloadData()
-    }
+    // ─── Data ────────────────────────────────────────────────────────────────
+    property var results: []
+    property string queryText: ""
 
     function reloadData() {
-        if (!pluginApi?.pluginSettings?.lastResults) return
+        if (!pluginApi) return
+        let raw = pluginApi.pluginSettings.lastResults
+        if (!raw || raw === "[]") return
         try {
-            let raw = pluginApi.pluginSettings.lastResults
-            let data = JSON.parse(raw)
-            root.parsedData = data
+            let parsed = JSON.parse(raw)
+            root.queryText = parsed.query || ""
+            root.results   = parsed.results || []
         } catch (e) {
-            Logger.e("HanziLookup/Panel", "Gagal parse data:", e.toString())
+            Logger.e("HanziLookup/Panel", "Parse error:", e.toString())
         }
     }
 
-    // ─── UI ──────────────────────────────────────────────────────────────────
+    // Reload setiap kali panel ditampilkan
+    onVisibleChanged: if (visible) reloadData()
+    Component.onCompleted: reloadData()
 
-    ColumnLayout {
-        id: contentColumn
-        anchors {
-            top:    parent.top
-            left:   parent.left
-            right:  parent.right
-            margins: 20
-        }
-        spacing: 4
-
-        // Header: query + tombol tutup
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-
-            // Label query
-            NText {
-                text: {
-                    let q = root.parsedData?.query ?? ""
-                    return q ? "Hasil untuk: " + q : "Hanzi Lookup"
-                }
-                font.pixelSize: Style.fontSize.sm
-                color: Style.color.onSurface2
-                Layout.fillWidth: true
-            }
-
-            // Tombol tutup
-            NButton {
-                text: "✕"
-                flat: true
-                onClicked: {
-                    if (pluginApi) {
-                        pluginApi.withCurrentScreen(screen => {
-                            pluginApi.closePanel(screen)
-                        })
-                    }
-                }
-            }
-        }
-
-        // Divider
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: Style.color.border
-            opacity: 0.3
-        }
-
-        // Pesan jika kosong
-        NText {
-            visible: !root.parsedData?.results?.length
-            text: "Tidak ada hasil"
-            color: Style.color.onSurface2
-            Layout.alignment: Qt.AlignHCenter
-            topPadding: 16
-            bottomPadding: 16
-        }
-
-        // ─── List hasil per karakter/kata ────────────────────────────────────
-        Repeater {
-            model: root.parsedData?.results ?? []
-
-            delegate: CharacterCard {
-                Layout.fillWidth: true
-                Layout.topMargin: 8
-
-                hanziData:      modelData
-                showTraditional: pluginApi?.pluginSettings?.showTraditional ?? true
-                showPinyin:      pluginApi?.pluginSettings?.showPinyin ?? true
-            }
-        }
-
-        // Spacer bawah
-        Item {
-            Layout.preferredHeight: 8
-        }
-    }
-
-    // ─── Component: CharacterCard ─────────────────────────────────────────────
-
-    component CharacterCard: Item {
-        id: card
-
-        property var hanziData: ({})
-        property bool showTraditional: true
-        property bool showPinyin: true
-
-        // Tinggi disesuaikan dengan isi
-        implicitHeight: cardLayout.implicitHeight + 24
-        implicitWidth: parent.width
-
-        // Background card
-        Rectangle {
-            anchors.fill: parent
-            radius: 12
-            color: Style.color.surface2
-            opacity: 0.7
-        }
+    // ─── Container utama ─────────────────────────────────────────────────────
+    Rectangle {
+        id: panelContainer
+        anchors.fill: parent
+        color: "transparent"
 
         ColumnLayout {
-            id: cardLayout
             anchors {
-                top:    parent.top
-                left:   parent.left
-                right:  parent.right
-                margins: 14
-                topMargin: 14
+                fill: parent
+                margins: Style.marginL
             }
-            spacing: 6
+            spacing: Style.marginM
 
-            // Baris atas: Hanzi besar + Pinyin
+            // ── Header ───────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 14
 
-                // Hanzi karakter (besar)
                 NText {
-                    text: card.hanziData?.hanzi ?? "?"
-                    font.pixelSize: 52
-                    font.weight: Font.Medium
-                    color: Style.color.onSurface
-
-                    // Badge jika phrase
-                    Rectangle {
-                        visible: card.hanziData?.is_phrase ?? false
-                        anchors {
-                            top: parent.top
-                            right: parent.right
-                            topMargin: 4
-                            rightMargin: -4
-                        }
-                        width: 36; height: 16
-                        radius: 8
-                        color: Style.color.primary
-                        opacity: 0.85
-
-                        NText {
-                            anchors.centerIn: parent
-                            text: "词"
-                            font.pixelSize: 9
-                            color: Style.color.onPrimary
-                        }
-                    }
+                    text: root.queryText ? "结果: " + root.queryText : "Hanzi Lookup"
+                    pointSize: Style.fontSizeL
+                    font.weight: Font.Bold
+                    color: Color.mOnSurface
+                    Layout.fillWidth: true
                 }
 
-                // Pinyin + Traditional
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 3
-
-                    // Pinyin (ambil dari entry pertama)
-                    NText {
-                        visible: card.showPinyin && (card.hanziData?.entries?.length ?? 0) > 0
-                        text: card.hanziData?.entries?.[0]?.pinyin ?? ""
-                        font.pixelSize: Style.fontSize.xl
-                        color: Style.color.primary
-                        font.weight: Font.Medium
-                    }
-
-                    // Karakter tradisional
-                    NText {
-                        visible: {
-                            if (!card.showTraditional) return false
-                            let trad = card.hanziData?.entries?.[0]?.traditional ?? ""
-                            let simp = card.hanziData?.hanzi ?? ""
-                            return trad !== simp  // tampilkan hanya jika beda
-                        }
-                        text: {
-                            let trad = card.hanziData?.entries?.[0]?.traditional ?? ""
-                            return trad ? "繁: " + trad : ""
-                        }
-                        font.pixelSize: Style.fontSize.sm
-                        color: Style.color.onSurface2
-                    }
+                NIconButton {
+                    icon: "x"
+                    onClicked: pluginApi.closePanel(pluginApi.panelOpenScreen)
                 }
             }
 
-            // Tidak ditemukan di dictionary
-            NText {
-                visible: (card.hanziData?.entries?.length ?? 0) === 0
-                text: "Tidak ditemukan di kamus"
-                color: Style.color.onSurface2
-                font.pixelSize: Style.fontSize.sm
-                font.italic: true
+            // Divider
+            Rectangle {
                 Layout.fillWidth: true
+                height: 1
+                color: Color.mOutline
+                opacity: 0.3
             }
 
-            // Definisi (tiap entry dari dictionary)
-            Repeater {
-                model: card.hanziData?.entries ?? []
+            // ── Kosong ───────────────────────────────────────────────────────
+            NText {
+                visible: root.results.length === 0
+                text: "Tidak ada hasil"
+                color: Color.mOnSurfaceVariant
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: Style.marginL
+            }
 
-                delegate: ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
+            // ── List hasil ───────────────────────────────────────────────────
+            NScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: root.results.length > 0
 
-                    // Pinyin alternatif (jika ada lebih dari 1 entry, tampilkan lagi)
-                    NText {
-                        visible: index > 0 && card.showPinyin
-                        text: modelData?.pinyin ?? ""
-                        font.pixelSize: Style.fontSize.sm
-                        color: Style.color.primary
-                        font.italic: true
-                    }
+                ListView {
+                    id: listView
+                    model: root.results
+                    spacing: Style.marginM
+                    clip: true
 
-                    // Meanings: tampilkan sebagai numbered list
-                    Repeater {
-                        model: modelData?.meanings?.slice(0, 5) ?? []
+                    delegate: Rectangle {
+                        width: listView.width
+                        height: cardContent.implicitHeight + Style.marginL * 2
+                        color: Color.mSurfaceVariant
+                        radius: Style.radiusL
 
-                        delegate: RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 6
+                        ColumnLayout {
+                            id: cardContent
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+                                margins: Style.marginL
+                                topMargin: Style.marginM
+                            }
+                            spacing: Style.marginS
 
-                            NText {
-                                text: (index + 1) + "."
-                                font.pixelSize: Style.fontSize.sm
-                                color: Style.color.onSurface2
-                                Layout.preferredWidth: 18
+                            // Baris atas: Hanzi besar + pinyin
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Style.marginM
+
+                                // Hanzi
+                                NText {
+                                    text: modelData.hanzi || "?"
+                                    pointSize: Style.fontSizeXXL * 1.5
+                                    font.weight: Font.Medium
+                                    color: Color.mOnSurface
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Style.marginXS
+
+                                    // Pinyin
+                                    NText {
+                                        visible: (modelData.entries?.length ?? 0) > 0
+                                        text: modelData.entries?.[0]?.pinyin ?? ""
+                                        pointSize: Style.fontSizeL
+                                        font.weight: Font.Medium
+                                        color: Color.mPrimary
+                                    }
+
+                                    // Tradisional (hanya jika beda)
+                                    NText {
+                                        visible: {
+                                            let t = modelData.entries?.[0]?.traditional ?? ""
+                                            return t && t !== modelData.hanzi
+                                        }
+                                        text: "繁: " + (modelData.entries?.[0]?.traditional ?? "")
+                                        pointSize: Style.fontSizeS
+                                        color: Color.mOnSurfaceVariant
+                                    }
+                                }
                             }
 
+                            // Tidak ditemukan
                             NText {
-                                text: modelData
-                                font.pixelSize: Style.fontSize.sm
-                                color: Style.color.onSurface
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
+                                visible: (modelData.entries?.length ?? 0) === 0
+                                text: "Tidak ditemukan di kamus"
+                                pointSize: Style.fontSizeS
+                                color: Color.mOnSurfaceVariant
+                                font.italic: true
+                            }
+
+                            // Arti-arti
+                            Repeater {
+                                model: modelData.entries ?? []
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Style.marginXS
+
+                                    // Pinyin alternatif (entry ke-2 dst)
+                                    NText {
+                                        visible: index > 0
+                                        text: modelData.pinyin ?? ""
+                                        pointSize: Style.fontSizeS
+                                        color: Color.mPrimary
+                                        font.italic: true
+                                    }
+
+                                    // Meanings
+                                    Repeater {
+                                        model: modelData.meanings?.slice(0, 5) ?? []
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: Style.marginS
+
+                                            NText {
+                                                text: (index + 1) + "."
+                                                pointSize: Style.fontSizeM
+                                                color: Color.mOnSurfaceVariant
+                                                Layout.preferredWidth: 20
+                                            }
+
+                                            NText {
+                                                text: modelData
+                                                pointSize: Style.fontSizeM
+                                                color: Color.mOnSurface
+                                                wrapMode: Text.WordWrap
+                                                Layout.fillWidth: true
+                                            }
+                                        }
+                                    }
+
+                                    // Divider antar entry
+                                    Rectangle {
+                                        visible: index < (cardContent.parent?.entries?.length ?? 1) - 1
+                                        Layout.fillWidth: true
+                                        height: 1
+                                        color: Color.mOutline
+                                        opacity: 0.2
+                                        Layout.topMargin: Style.marginXS
+                                    }
+                                }
                             }
                         }
-                    }
-
-                    // Divider antar entry
-                    Rectangle {
-                        visible: index < (card.hanziData?.entries?.length ?? 1) - 1
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Style.color.border
-                        opacity: 0.2
-                        Layout.topMargin: 4
                     }
                 }
             }
