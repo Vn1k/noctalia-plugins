@@ -231,28 +231,48 @@ def capture_area() -> Optional[str]:
     return tmpfile.name
 
 
+_ocr_instance = None
+
+def get_ocr():
+    """Lazy-load instance CnOCR dengan dukungan GPU"""
+    global _ocr_instance
+    if _ocr_instance is None:
+        log.info("Memulai inisialisasi CnOCR di GPU...")
+        from cnocr import CnOcr
+        try:
+            # Coba jalankan di GPU (CUDA)
+            _ocr_instance = CnOcr(context='cuda', det_model_name=None)
+            log.info("CnOCR berhasil dimuat menggunakan GPU (CUDA).")
+        except Exception as e:
+            log.warn(f"Gagal memuat GPU ({e}), beralih ke CPU.")
+            # Fallback otomatis ke CPU jika CUDA gagal
+            _ocr_instance = CnOcr(context='cpu', det_model_name=None)
+    return _ocr_instance
+
 def run_ocr(image_path: str) -> Optional[str]:
     """
     Jalankan CnOCR untuk ekstraksi karakter Hanzi tingkat tinggi.
     """
     log.info(f"Menjalankan CnOCR pada {image_path}...")
-    try:
-        from cnocr import CnOcr
+    from PIL import Image
+
+    with Image.open(image_path) as img:
+        img = img.convert('RGB')
+        w, h = img.size
+        img = img.resize((w * 2, h * 2), Image.LANCZOS)
+        img.save(image_path)
         
-        # Inisialisasi model CnOCR
-        ocr = CnOcr()
+    try:
+        # Gunakan instance yang sudah ada
+        ocr = get_ocr()
         ocr_results = ocr.ocr(image_path)
         
-        # Gabungkan hasil pembacaan teks
         text_list = [line['text'] for line in ocr_results if 'text' in line]
         text = "".join(text_list).strip()
         
         log.info(f"CnOCR result: {repr(text)}")
         return text if text else None
 
-    except ImportError:
-        log.error("cnocr tidak terinstall. Jalankan: pip install cnocr")
-        return None
     except Exception as e:
         log.error(f"OCR error: {e}")
         return None
