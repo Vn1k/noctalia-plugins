@@ -8,15 +8,11 @@ NIconButtonHot {
     property var pluginApi: null
 
     icon: "language"
-    tooltipText: "Hanzi Lookup — pilih area layar"
+    tooltipText: "Open My Dictionary"
 
     onClicked: {
-        lookupProcess.running = true
-    }
-
-    Process {
-        id: lookupProcess
-        command: ["bash", "-c", "python3 ~/.local/bin/hanzi-lookup.py &"]
-        running: false
+        if (pluginApi) {
+            pluginApi.openPanel(screen)
+        }
     }
 }

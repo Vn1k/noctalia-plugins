@@ -125,5 +125,25 @@ Item {
             pluginApi.saveSettings()
             Logger.i("HanziLookup", "Hasil dibersihkan")
         }
+
+        /**
+         * togglePanelDirect()
+         *
+         * Opens or closes the panel directly without triggering OCR.
+         * Perfect for binding to a keyboard shortcut.
+         */
+        function togglePanelDirect() {
+            if (!pluginApi) return
+            pluginApi.withCurrentScreen(screen => {
+                // If Noctalia API supports togglePanel
+                if (typeof pluginApi.togglePanel === "function") {
+                    pluginApi.togglePanel(screen)
+                } else {
+                    // Fallback if togglePanel doesn't exist, just open it
+                    pluginApi.openPanel(screen)
+                }
+                Logger.i("HanziLookup", "Panel triggered directly via IPC")
+            })
+        }
     }
 }
