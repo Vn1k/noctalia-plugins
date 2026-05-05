@@ -5,6 +5,7 @@ import json
 import subprocess
 import logging
 from pathlib import Path
+import sys
 
 from hanzi_lookup import load_cedict, lookup_hanzi, get_ai_translation 
 
@@ -87,3 +88,6 @@ def main():
                 conn.close()
                 if os.path.exists(image_path):
                     os.unlink(image_path) # Hapus file sementara
+
+if __name__ == "__main__":
+    main()
