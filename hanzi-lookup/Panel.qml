@@ -93,9 +93,10 @@ Item {
                 Layout.fillHeight: true
                 visible: root.results.length > 0
 
-
                 ListView {
                     id: listView
+                    anchors.fill: parent
+                    
                     model: root.results
                     spacing: Style.marginM
                     clip: true
@@ -105,7 +106,8 @@ Item {
                         width: listView.width
                         property var resultData: modelData 
                         
-                        height: cardContent.implicitHeight + Style.marginL * 2
+                        // Gunakan implicitHeight agar tinggi kotak menyesuaikan isi teks
+                        implicitHeight: cardContent.implicitHeight + (Style.marginL * 2)
                         color: Color.mSurfaceVariant
                         radius: Style.radiusL
 
@@ -129,7 +131,6 @@ Item {
                                 }
                                 
                                 NText {
-                                    // Ambil pinyin dari entri pertama
                                     text: (resultData.entries?.length > 0) ? resultData.entries[0].pinyin : ""
                                     pointSize: Style.fontSizeL
                                     color: Color.mPrimary
@@ -143,7 +144,6 @@ Item {
                                 delegate: ColumnLayout {
                                     id: entryItem
                                     Layout.fillWidth: true
-                                    // Alias untuk data entri saat ini
                                     property var entryData: modelData 
 
                                     // ── List Arti (Repeater Kedua) ──
@@ -160,7 +160,6 @@ Item {
                                             }
 
                                             NText {
-                                                // Di sini modelData adalah string arti yang aman
                                                 text: modelData
                                                 Layout.fillWidth: true
                                                 wrapMode: Text.WordWrap
@@ -169,7 +168,7 @@ Item {
                                         }
                                     }
 
-                                    // Divider jika ada lebih dari satu entri
+                                    // Divider antar entri
                                     Rectangle {
                                         visible: index < (resultData.entries.length - 1)
                                         Layout.fillWidth: true
