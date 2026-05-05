@@ -169,59 +169,74 @@ def _apply_tone(syllable: str, tone: int) -> str:
 
 def lookup_hanzi(text: str, dictionary: dict) -> list[dict]:
     """
-    Lookup Hanzi dari teks OCR.
+    Lookup Hanzi dari teks OCR menggunakan algoritma Forward Maximum Matching (Greedy Search).
     Strategi:
-      1. Coba lookup frase penuh (multi-karakter)
-      2. Fallback: lookup per karakter
-    Return list of result objects.
+      1. Memecah teks dari blok non-CJK.
+      2. Memindai setiap blok dari karakter terpanjang hingga terpendek.
+      3. Jika ditemukan di kamus, rekam kata majemuk tersebut dan lompat maju.
+      4. Fallback: terjemahkan per karakter jika tidak ada gabungan yang cocok.
     """
     text = text.strip()
     if not text:
         return []
 
-    # Bersihkan: ambil hanya karakter CJK
+    # Bersihkan: ubah non-CJK menjadi spasi agar bisa di-split menjadi potongan (chunks)
     cjk_only = re.sub(r'[^\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df]', ' ', text)
-    tokens = cjk_only.split()
+    chunks = cjk_only.split()
 
-    if not tokens:
+    if not chunks:
         log.warning(f"Tidak ada karakter CJK ditemukan dalam: {repr(text)}")
         return []
 
     results = []
     seen = set()
+    chars_processed = 0
 
-    for token in tokens[:MAX_LOOKUP_CHARS]:
-        # Coba frase penuh dulu
-        if token in dictionary and token not in seen:
-            entries = dictionary[token]
-            results.append({
-                "hanzi": token,
-                "entries": entries[:3],  # max 3 definisi per karakter
-                "is_phrase": len(token) > 1
-            })
-            seen.add(token)
-            continue
-
-        # Kalau frase tidak ketemu, coba per karakter
-        if len(token) > 1:
-            for char in token:
-                if char in dictionary and char not in seen:
-                    entries = dictionary[char]
-                    results.append({
-                        "hanzi": char,
-                        "entries": entries[:3],
-                        "is_phrase": False
-                    })
+    for chunk in chunks:
+        n = len(chunk)
+        i = 0
+        
+        while i < n and chars_processed < MAX_LOOKUP_CHARS:
+            matched = False
+            
+            # Coba substring dari yang terpanjang ke yang terpendek di dalam chunk
+            for j in range(n, i, -1):
+                word = chunk[i:j]
+                
+                # Jika kata majemuk/karakter ditemukan di kamus
+                if word in dictionary:
+                    if word not in seen:
+                        entries = dictionary[word]
+                        results.append({
+                            "hanzi": word,
+                            "entries": entries[:3],  # max 3 definisi per kata
+                            "is_phrase": len(word) > 1
+                        })
+                        seen.add(word)
+                    
+                    # Lompat indeks i sejauh panjang kata yang ditemukan
+                    i = j
+                    matched = True
+                    chars_processed += len(word)
+                    break
+            
+            # Jika tidak ada satu pun kombinasi yang cocok, proses sebagai 1 karakter tunggal
+            if not matched:
+                char = chunk[i]
+                if char not in seen:
+                    # Ambil entri jika ada, kosongkan jika tidak
+                    entries = dictionary.get(char, [])
+                    if entries:
+                        results.append({
+                            "hanzi": char,
+                            "entries": entries[:3],
+                            "is_phrase": False
+                        })
                     seen.add(char)
-        elif token not in seen:
-            # Single char tidak ketemu
-            log.debug(f"Karakter tidak ditemukan: {token}")
-            results.append({
-                "hanzi": token,
-                "entries": [],
-                "is_phrase": False
-            })
-            seen.add(token)
+                
+                # Maju 1 karakter
+                i += 1
+                chars_processed += 1
 
     return results
 
