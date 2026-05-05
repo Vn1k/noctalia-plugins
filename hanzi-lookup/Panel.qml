@@ -22,6 +22,7 @@ Item {
     // ─── Data & State ────────────────────────────────────────────────────────
     property var results: []
     property string queryText: ""
+    property string currentMode: "OCR"
     
     // New State for My Dictionary (Favorites)
     property bool showSavedOnly: false
@@ -35,6 +36,7 @@ Item {
             let parsed = JSON.parse(raw)
             root.queryText = parsed.query || ""
             root.results   = parsed.results || []
+            root.currentMode = pluginApi.pluginSettings.lastMode || "OCR"
         } catch (e) {
             Logger.e("HanziLookup/Panel", "Parse error:", e.toString())
         }
@@ -185,8 +187,9 @@ Item {
 
             // ── AI Translation (Hidden in Dictionary mode) ──────────────────────
             NText {
-                visible: !root.showSavedOnly && root.results.length > 0
-                text: pluginApi.pluginSettings.aiTranslation || "Load AI translation..."
+                // Teks ini hanya muncul jika mode-nya OCR dan bukan di mode Kamus
+                visible: !root.showSavedOnly && root.results.length > 0 && root.currentMode === "OCR"
+                text: pluginApi.pluginSettings.aiTranslation || "Loading AI translation..."
                 pointSize: Style.fontSizeM
                 color: Color.mOnSurfaceVariant  
                 wrapMode: Text.WordWrap

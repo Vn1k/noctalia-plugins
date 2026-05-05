@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Optional
 import requests
 import threading
+from ultralytics import YOLO
 
 # ─── Konfigurasi ────────────────────────────────────────────────────────────
 
@@ -300,6 +301,78 @@ def get_ai_translation(text, ipc_target):
     except Exception as e:
         log.error(f"AI Translation Error: {e}")
 
+# ─── Lazy Load YOLO ─────────────────────────────────────────────────────────
+
+_yolo_instance = None
+
+def get_yolo():
+    """Lazy-load instance YOLOv8 agar memori tidak penuh jika belum dipakai"""
+    global _yolo_instance
+    if _yolo_instance is None:
+        log.info("Memuat model YOLO...")
+        _yolo_instance = YOLO("yolo11s.pt")
+    return _yolo_instance
+
+# ─── Object Translation (Ollama) ────────────────────────────────────────────
+
+def get_ai_translation_for_object(english_noun: str) -> str:
+    """Terjemahkan nama objek bahasa Inggris dari YOLO ke Mandarin"""
+    prompt = f"Translate the English noun '{english_noun}' to Simplified Chinese. Output ONLY the Chinese characters, absolutely nothing else."
+    try:
+        response = requests.post('http://localhost:11434/api/generate', json={
+            "model": "qwen2.5:1.5b-instruct",
+            "prompt": prompt,
+            "stream": False
+        })
+        return response.json().get("response", "").strip()
+    except Exception as e:
+        log.error(f"Auto-translate error: {e}")
+        return ""
+
+# ─── Smart Fallback Pipeline (Teks -> Benda) ────────────────────────────────
+def process_image_smart(image_path: str) -> tuple[str, bool]:
+    """
+    Pipeline pintar: Coba OCR dulu. Jika gagal (tidak ada Hanzi), tebak pakai YOLO.
+    Return: (text_hasil, is_text_mode_boolean)
+    """
+    from PIL import Image
+
+    # 1. Persiapan Gambar Khusus OCR (Diperbesar 2x)
+    with Image.open(image_path) as img:
+        img = img.convert('RGB')
+        w, h = img.size
+        img_resized = img.resize((w * 2, h * 2), Image.LANCZOS)
+        ocr_tmp_path = image_path + "_ocr.png"
+        img_resized.save(ocr_tmp_path)
+        
+    # Coba jalankan OCR
+    ocr = get_ocr()
+    ocr_results = ocr.ocr(ocr_tmp_path)
+    ocr_text = "".join([line['text'] for line in ocr_results if 'text' in line]).strip()
+    os.unlink(ocr_tmp_path) # Hapus file sementara OCR
+    
+    # Validasi: Apakah ada Hanzi?
+    if ocr_text and re.search(r'[\u4e00-\u9fff]', ocr_text):
+        log.info(f"[Mode OCR] Terdeteksi Hanzi: {ocr_text}")
+        return ocr_text, True
+        
+    # 2. Jika tidak ada teks, gunakan gambar asli (ukuran normal) untuk YOLO
+    log.info("[Mode OBJ] Tidak ada Hanzi. Mengalihkan gambar ke YOLO...")
+    yolo = get_yolo()
+    yolo_res = yolo(image_path, verbose=False)
+    
+    if len(yolo_res) > 0 and len(yolo_res[0].boxes) > 0:
+        best_box = yolo_res[0].boxes[0]
+        class_id = int(best_box.cls[0])
+        english_name = yolo.names[class_id]
+        log.info(f"YOLO mendeteksi objek: {english_name}")
+        
+        # Translate via Ollama
+        translated_text = get_ai_translation_for_object(english_name)
+        log.info(f"Ollama menerjemahkan menjadi: {translated_text}")
+        return translated_text, False
+        
+    return "", False
 
 # ─── IPC ────────────────────────────────────────────────────────────────────
 

@@ -61,41 +61,42 @@ Item {
 
         function showResult(jsonData: string) {
             if (!pluginApi) {
-                Logger.e("HanziLookup", "pluginApi tidak tersedia saat showResult dipanggil")
+                Logger.e("HanziLookup", "pluginApi is not available when showResult is called")
                 return
             }
 
-            Logger.i("HanziLookup", "Menerima data IPC:", jsonData.substring(0, 100) + "...")
+            Logger.i("HanziLookup", "Received IPC data:", jsonData.substring(0, 100) + "...")
 
-            // Validasi JSON
             let parsed
             try {
                 parsed = JSON.parse(jsonData)
             } catch (e) {
-                Logger.e("HanziLookup", "JSON tidak valid:", e.toString())
-                ToastService.showError("Hanzi Lookup: Data tidak valid")
+                Logger.e("HanziLookup", "Invalid JSON:", e.toString())
+                ToastService.showError("Hanzi Lookup: Invalid data")
                 return
             }
 
             if (!parsed.results || parsed.results.length === 0) {
-                Logger.w("HanziLookup", "Tidak ada hasil untuk:", parsed.query)
-                ToastService.showNotice("Tidak ditemukan hasil untuk: " + (parsed.query || ""))
+                Logger.w("HanziLookup", "No results for:", parsed.query)
+                ToastService.showNotice("No results found for: " + (parsed.query || ""))
                 return
             }
 
-            // Simpan ke settings (Panel.qml akan membacanya)
-            pluginApi.pluginSettings.aiTranslation = "Load AI translation..."
+            // Save to settings
+            pluginApi.pluginSettings.lastMode    = parsed.mode || "OCR"
+            
+            // If it's an object, hide the AI loading text. If OCR, show loading.
+            pluginApi.pluginSettings.aiTranslation = (parsed.mode === "OBJ") ? "" : "Loading AI translation..."
+            
             pluginApi.pluginSettings.lastQuery   = parsed.query   || ""
             pluginApi.pluginSettings.lastResults = jsonData
             pluginApi.pluginSettings.hasResults  = true
             pluginApi.saveSettings()
 
-            Logger.i("HanziLookup", "Menyimpan", parsed.results.length, "hasil")
+            Logger.i("HanziLookup", "Saved", parsed.results.length, "results")
 
-            // Buka panel di layar yang aktif
             pluginApi.withCurrentScreen(screen => {
                 pluginApi.openPanel(screen)
-                Logger.i("HanziLookup", "Panel dibuka di screen:", screen)
             })
         }
 

@@ -5,9 +5,10 @@ import json
 import subprocess
 import logging
 from pathlib import Path
+import threading
 import sys
 
-from hanzi_lookup import load_cedict, lookup_hanzi, get_ai_translation 
+from hanzi_lookup import load_cedict, lookup_hanzi, get_ai_translation, process_image_smart
 
 SOCKET_PATH = '/tmp/hanzi_lookup.sock'
 CEDICT_PATH = Path.home() / ".local" / "share" / "hanzi-lookup" / "cedict_ts.u8"
@@ -26,21 +27,12 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 def main():
-    log.info("Memulai Hanzi Server Daemon...")
+    log.info("Memulai Hanzi Server Daemon (Smart Mode)...")
     
-    # 1. Load CC-CEDICT (Hanya sekali)
+    # 1. Load Kamus (Hanya sekali di awal)
     dictionary = load_cedict(CEDICT_PATH)
     
-    # 2. Inisialisasi CnOCR di GPU (Hanya sekali)
-    from cnocr import CnOcr
-    try:
-        ocr = CnOcr(context='cuda', det_model_name=None)
-        log.info("CnOCR siap di GPU (CUDA).")
-    except Exception as e:
-        log.warning(f"Gagal memuat GPU, beralih ke CPU: {e}")
-        ocr = CnOcr(context='cpu', det_model_name=None)
-
-    # 3. Setup Unix Socket
+    # 2. Setup Unix Socket
     if os.path.exists(SOCKET_PATH):
         os.remove(SOCKET_PATH)
         
@@ -51,43 +43,40 @@ def main():
         
         while True:
             conn, _ = server.accept()
+            image_path = None
             try:
-                # Terima path gambar dari Client
                 image_path = conn.recv(1024).decode().strip()
                 if not image_path or not os.path.exists(image_path):
                     continue
                 
-                log.info(f"Menerima tugas baru: {image_path}")
+                log.info(f"Menerima tangkapan layar baru: {image_path}")
                 
-                # Preprocessing gambar (Resize 2x)
-                from PIL import Image
-                with Image.open(image_path) as img:
-                    img = img.convert('RGB')
-                    w, h = img.size
-                    img = img.resize((w * 2, h * 2), Image.LANCZOS)
-                    img.save(image_path)
+                # ─── PANGGIL SMART PIPELINE DARI LOOKUP ───
+                final_text, is_text_mode = process_image_smart(image_path)
                 
-                # Proses OCR (Sangat Cepat karena model sudah di VRAM)
-                ocr_results = ocr.ocr(image_path)
-                text = "".join([line['text'] for line in ocr_results if 'text' in line]).strip()
-                
-                if text:
-                    # Jalankan AI Translation di background
-                    import threading
-                    threading.Thread(target=get_ai_translation, args=(text, IPC_TARGET)).start()
+                if final_text:
+                    # Jalankan AI Translation panjang HANYA jika mode teks (OCR)
+                    # (Karena kalau objek, artinya sudah hanya 1 kata Hanzi singkat)
+                    if is_text_mode:
+                        threading.Thread(target=get_ai_translation, args=(final_text, IPC_TARGET)).start()
                     
-                    # Lookup kamus dan kirim ke Noctalia
-                    results = lookup_hanzi(text, dictionary)
+                    # Lookup kamus CC-CEDICT dan kirim ke Noctalia
+                    results = lookup_hanzi(final_text, dictionary)
                     if results:
-                        payload = json.dumps({"query": text, "results": results}, ensure_ascii=False)
+                        payload = json.dumps({
+                            "query": final_text, 
+                            "results": results, 
+                            "mode": "OCR" if is_text_mode else "OBJ"
+                        }, ensure_ascii=False)
+                        
                         subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", IPC_TARGET, "showResult", payload])
                         
             except Exception as e:
                 log.error(f"Error memproses koneksi: {e}")
             finally:
                 conn.close()
-                if os.path.exists(image_path):
-                    os.unlink(image_path) # Hapus file sementara
+                if image_path and os.path.exists(image_path):
+                    os.unlink(image_path)
 
 if __name__ == "__main__":
     main()
