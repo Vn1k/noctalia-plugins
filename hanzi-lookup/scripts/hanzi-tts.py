@@ -12,6 +12,12 @@ def main():
     if not text:
         sys.exit(0)
 
+    if len(text) == 1:
+        if re.search(r'[\u4e00-\u9fff]', text):
+            text = "，" + text + "。" 
+        else:
+            text = ", " + text + "."
+
     # Deteksi bahasa secara otomatis
     if re.search(r'[\u4e00-\u9fff]', text):
         language = "ZH"
