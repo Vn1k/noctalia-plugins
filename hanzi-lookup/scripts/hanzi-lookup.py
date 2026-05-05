@@ -453,7 +453,12 @@ def main():
             sys.exit(1)
 
     # Lookup di dictionary
-    threading.Thread(target=get_ai_translation, args=(hanzi_text, IPC_TARGET), daemon=True).start()
+    ai_thread = threading.Thread(
+        target=get_ai_translation, 
+        args=(hanzi_text, IPC_TARGET), 
+        daemon=False 
+    )
+    ai_thread.start()
     results = lookup_hanzi(hanzi_text, dictionary)
 
     if not results:
@@ -464,7 +469,7 @@ def main():
     # Kirim ke Noctalia
     send_to_noctalia(results, hanzi_text)
     log.info(f"Selesai. {len(results)} karakter/kata ditemukan.")
-
+    log.info("Hasil awal dikirim, menunggu AI di background...")
 
 if __name__ == "__main__":
     main()

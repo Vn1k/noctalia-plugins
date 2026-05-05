@@ -84,6 +84,7 @@ Item {
             }
 
             // Simpan ke settings (Panel.qml akan membacanya)
+            pluginApi.pluginSettings.aiTranslation = "Load AI translation..."
             pluginApi.pluginSettings.lastQuery   = parsed.query   || ""
             pluginApi.pluginSettings.lastResults = jsonData
             pluginApi.pluginSettings.hasResults  = true
