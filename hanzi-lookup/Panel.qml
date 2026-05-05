@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.Commons
 import qs.Services.UI
 import qs.Widgets
@@ -39,6 +40,18 @@ Item {
     onVisibleChanged: if (visible) reloadData()
     Component.onCompleted: reloadData()
 
+    Process {
+        id: ttsProcess
+        running: false
+    }
+
+    function playTts(text) {
+        if (!text) return
+        let escapedText = text.replace(/'/g, "'\\''")
+        ttsProcess.command = ["bash", "-c", "python3 ~/.local/bin/hanzi-tts.py '" + escapedText + "' &"]
+        ttsProcess.running = true
+    }
+
     // ─── Container utama ─────────────────────────────────────────────────────
     Rectangle {
         id: panelContainer
@@ -62,6 +75,12 @@ Item {
                     font.weight: Font.Bold
                     color: Color.mOnSurface
                     Layout.fillWidth: true
+                }
+
+                NIconButton {
+                    icon: "volume-2"
+                    visible: root.queryText.length > 0
+                    onClicked: root.playTts(root.queryText)
                 }
 
                 NIconButton {
@@ -178,6 +197,12 @@ Item {
                                     pointSize: Style.fontSizeL
                                     color: Color.mPrimary
                                     Layout.fillWidth: true
+                                }
+
+                                NIconButton {
+                                    icon: "volume-2"
+                                    visible: !!resultData.hanzi
+                                    onClicked: root.playTts(resultData.hanzi)
                                 }
                             }
 

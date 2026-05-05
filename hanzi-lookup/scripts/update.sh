@@ -27,7 +27,7 @@ PLUGIN_DIR="$HOME/.config/noctalia/plugins/hanzi-lookup"
 step "Step 1: Memperbarui Skrip Python"
 
 # Array berisi nama-nama file arsitektur Daemon yang baru
-PYTHON_SCRIPTS=("hanzi-server.py" "hanzi-client.py" "hanzi_lookup.py")
+PYTHON_SCRIPTS=("hanzi-server.py" "hanzi-client.py" "hanzi_lookup.py" "hanzi-tts.py")
 
 for script in "${PYTHON_SCRIPTS[@]}"; do
     if [ -f "$SCRIPT_DIR/$script" ]; then
