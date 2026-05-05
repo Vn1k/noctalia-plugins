@@ -1,35 +1,22 @@
-/**
- * ControlCenterWidget.qml — Hanzi Lookup Control Center Button
- *
- * Tombol di Control Center untuk trigger hanzi lookup secara manual
- * tanpa perlu pakai hotkey.
- */
-
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import qs.Widgets
-import qs.Commons
 
-Item {
-    id: root
-
+NIconButtonHot {
+    property ShellScreen screen
     property var pluginApi: null
 
-    implicitWidth:  64
-    implicitHeight: 64
+    icon: "language"
+    tooltipText: "Hanzi Lookup — pilih area layar"
 
-    NButton {
-        anchors.fill: parent
+    onClicked: {
+        lookupProcess.running = true
+    }
 
-        icon:    "translate"
-        text:    "汉字"
-        flat:    false
-        active:  pluginApi?.pluginSettings?.hasResults ?? false
-
-        onClicked: {
-            // Jalankan script Python via shell
-            Qt.openUrlExternally("exec:bash -c 'python3 ~/.local/bin/hanzi-lookup.py &'")
-        }
-
-        tooltip: "Hanzi Lookup — pilih area layar untuk lookup pinyin & arti"
+    Process {
+        id: lookupProcess
+        command: ["bash", "-c", "python3 ~/.local/bin/hanzi-lookup.py &"]
+        running: false
     }
 }
