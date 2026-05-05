@@ -10,7 +10,7 @@ Item {
 
     property var pluginApi: null
 
-    // ─── Wajib untuk sistem panel Noctalia ───────────────────────────────────
+    // ─── Required for Noctalia panel system ───────────────────────────────────
     readonly property var geometryPlaceholder: panelContainer
     readonly property bool allowAttach: true
 
@@ -19,9 +19,13 @@ Item {
 
     anchors.fill: parent
 
-    // ─── Data ────────────────────────────────────────────────────────────────
+    // ─── Data & State ────────────────────────────────────────────────────────
     property var results: []
     property string queryText: ""
+    
+    // New State for My Dictionary (Favorites)
+    property bool showSavedOnly: false
+    property var savedList: []
 
     function reloadData() {
         if (!pluginApi) return
@@ -36,10 +40,58 @@ Item {
         }
     }
 
-    // Reload setiap kali panel ditampilkan
-    onVisibleChanged: if (visible) reloadData()
-    Component.onCompleted: reloadData()
+    // Load saved vocabulary list from plugin settings
+    function loadSavedVocab() {
+        if (!pluginApi) return
+        let raw = pluginApi.pluginSettings.savedVocab || "[]"
+        try {
+            root.savedList = JSON.parse(raw)
+        } catch (e) {
+            root.savedList = []
+        }
+    }
 
+    // Check if a specific Hanzi is already bookmarked
+    function isSaved(hanzi) {
+        if (!hanzi) return false
+        for (let i = 0; i < root.savedList.length; i++) {
+            if (root.savedList[i].hanzi === hanzi) return true
+        }
+        return false
+    }
+
+    // Add or Remove word from the saved list
+    function toggleSave(resultObj) {
+        if (!pluginApi || !resultObj.hanzi) return
+        
+        loadSavedVocab() // Ensure reading the latest data
+        
+        let index = -1
+        for (let i = 0; i < root.savedList.length; i++) {
+            if (root.savedList[i].hanzi === resultObj.hanzi) {
+                index = i
+                break
+            }
+        }
+
+        let temp = root.savedList
+        if (index > -1) {
+            temp.splice(index, 1) // Remove if it already exists (unstar)
+        } else {
+            temp.push(resultObj)  // Save complete object so card format doesn't break (star)
+        }
+
+        root.savedList = temp
+        pluginApi.pluginSettings.savedVocab = JSON.stringify(temp)
+        pluginApi.saveSettings()
+        root.loadSavedVocab() // Refresh UI state
+    }
+
+    // Reload every time the panel is shown
+    onVisibleChanged: if (visible) { reloadData(); loadSavedVocab(); }
+    Component.onCompleted: { reloadData(); loadSavedVocab(); }
+
+    // ─── Process Helper for TTS ─────────────────────────────────────────────
     Process {
         id: ttsProcess
         running: false
@@ -52,7 +104,7 @@ Item {
         ttsProcess.running = true
     }
 
-    // ─── Container utama ─────────────────────────────────────────────────────
+    // ─── Main Container ─────────────────────────────────────────────────────
     Rectangle {
         id: panelContainer
         anchors.fill: parent
@@ -70,16 +122,32 @@ Item {
                 Layout.fillWidth: true
 
                 NText {
-                    text: root.queryText ? "结果: " + root.queryText : "Hanzi Lookup"
+                    // Changes dynamically depending on mode (Search Results vs My Dictionary)
+                    text: root.showSavedOnly ? "My Dictionary" : (root.queryText ? "结果: " + root.queryText : "Hanzi Lookup")
                     pointSize: Style.fontSizeL
                     font.weight: Font.Bold
                     color: Color.mOnSurface
                     Layout.fillWidth: true
                 }
 
+                // ── Toggle Button for "My Dictionary" (Favorites) ──
+                NIconButton {
+                    icon: root.showSavedOnly ? "search" : "bookmark"
+                    tooltipText: root.showSavedOnly ? "Back to Search" : "Open My Dictionary"
+                    onClicked: {
+                        root.showSavedOnly = !root.showSavedOnly
+                        if (root.showSavedOnly) {
+                            root.loadSavedVocab()
+                        } else {
+                            root.reloadData()
+                        }
+                    }
+                }
+
+                // ── Main Audio Button (Only appears in search mode) ──
                 NIconButton {
                     icon: "volume-2"
-                    visible: root.queryText.length > 0
+                    visible: !root.showSavedOnly && root.queryText.length > 0
                     onClicked: root.playTts(root.queryText)
                 }
 
@@ -89,22 +157,21 @@ Item {
                 }
             }
 
+            // ── Combined Pinyin (Hidden in Dictionary mode) ─────────────────────
             NText {
-                visible: root.results.length > 0
+                visible: !root.showSavedOnly && root.results.length > 0
                 
-                // Logika penggabungan Pinyin
                 text: {
                     let pinyinArray = []
                     for (let i = 0; i < root.results.length; i++) {
                         let res = root.results[i]
-                        // Ambil pinyin dari entri pertama jika ada, jika tidak, tampilkan hanzi-nya
                         if (res.entries && res.entries.length > 0 && res.entries[0].pinyin) {
                             pinyinArray.push(res.entries[0].pinyin)
                         } else {
                             pinyinArray.push(res.hanzi) 
                         }
                     }
-                    return pinyinArray.join("  ") // Gabungkan dengan 2 spasi agar lega
+                    return pinyinArray.join("  ") 
                 }
                 
                 pointSize: Style.fontSizeL
@@ -112,63 +179,59 @@ Item {
                 font.italic: true
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
-                
-                // Margin agar posisinya pas di bawah teks "结果..."
-                Layout.topMargin: -Style.marginM 
+                Layout.topMargin: -Style.marginM
                 Layout.bottomMargin: Style.marginS
             }
 
+            // ── AI Translation (Hidden in Dictionary mode) ──────────────────────
             NText {
-                visible: root.results.length > 0
-                
+                visible: !root.showSavedOnly && root.results.length > 0
                 text: pluginApi.pluginSettings.aiTranslation || "Load AI translation..."
-                
                 pointSize: Style.fontSizeM
-                color: Color.mOnSurfaceVariant  // Warna redup agar minimalis
+                color: Color.mOnSurfaceVariant  
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
-                
                 Layout.topMargin: -Style.marginS
                 Layout.bottomMargin: Style.marginM
             }
 
-            // Divider
+            // Divider Line
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
                 color: Color.mOutline
                 opacity: 0.3
+                visible: root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0)
             }
 
-            // ── Kosong ───────────────────────────────────────────────────────
+            // ── Empty State View ────────────────────────────────────────
             NText {
-                visible: root.results.length === 0
-                text: "Tidak ada hasil"
+                visible: root.showSavedOnly ? (root.savedList.length === 0) : (root.results.length === 0)
+                text: root.showSavedOnly ? "Your dictionary is empty" : "No results found"
                 color: Color.mOnSurfaceVariant
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: Style.marginL
             }
 
-            // ── List hasil ───────────────────────────────────────────────────
+            // ── Selected Results / Dictionary List ──────────────────────────────────
             NScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: root.results.length > 0
+                visible: root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0)
 
                 ListView {
                     id: listView
                     anchors.fill: parent
                     
-                    model: root.results
+                    // Change model dynamically based on view state
+                    model: root.showSavedOnly ? root.savedList : root.results
                     spacing: Style.marginM
                     clip: true
 
                     delegate: Rectangle {
                         id: resultContainer
                         width: listView.width
-                        property var resultData: modelData 
-                        
-                        // Gunakan implicitHeight agar tinggi kotak menyesuaikan isi teks
+                        property var resultData: modelData  
                         implicitHeight: cardContent.implicitHeight + (Style.marginL * 2)
                         color: Color.mSurfaceVariant
                         radius: Style.radiusL
@@ -183,9 +246,10 @@ Item {
                             }
                             spacing: Style.marginS
 
-                            // ── Baris Hanzi & Pinyin ──
+                            // ── Hanzi, Pinyin & Control Buttons Row ──
                             RowLayout {
                                 Layout.fillWidth: true
+                                
                                 NText {
                                     text: resultData.hanzi || "?"
                                     pointSize: Style.fontSizeXXL
@@ -199,14 +263,23 @@ Item {
                                     Layout.fillWidth: true
                                 }
 
+                                // 1. Audio Button Per-Card
                                 NIconButton {
                                     icon: "volume-2"
                                     visible: !!resultData.hanzi
                                     onClicked: root.playTts(resultData.hanzi)
                                 }
+
+                                // 2. Bookmark / Star Button (My Dictionary)
+                                NIconButton {
+                                    // Changes icon shape based on saved state
+                                    icon: root.isSaved(resultData.hanzi) ? "star" : "star-off"
+                                    visible: !!resultData.hanzi
+                                    onClicked: root.toggleSave(resultData)
+                                }
                             }
 
-                            // ── List Entri (Repeater Pertama) ──
+                            // ── Meaning Dictionary ──
                             Repeater {
                                 model: resultData.entries || []
                                 delegate: ColumnLayout {
@@ -214,7 +287,6 @@ Item {
                                     Layout.fillWidth: true
                                     property var entryData: modelData 
 
-                                    // ── List Arti (Repeater Kedua) ──
                                     Repeater {
                                         model: entryData.meanings || []
                                         delegate: RowLayout {
@@ -236,7 +308,6 @@ Item {
                                         }
                                     }
 
-                                    // Divider antar entri
                                     Rectangle {
                                         visible: index < (resultData.entries.length - 1)
                                         Layout.fillWidth: true
