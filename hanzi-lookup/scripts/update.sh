@@ -23,16 +23,30 @@ BIN_DIR="$HOME/.local/bin"
 PLUGIN_DIR="$HOME/.config/noctalia/plugins/hanzi-lookup"
 
 # ─── Step 1: Update Python Script ────────────────────────────────────────────
+# ─── Step 1: Update Python Script ────────────────────────────────────────────
 step "Step 1: Memperbarui Skrip Python"
 
-if [ -f "$SCRIPT_DIR/hanzi-lookup.py" ]; then
-    info "Menyalin hanzi-lookup.py ke ~/.local/bin/..."
-    cp "$SCRIPT_DIR/hanzi-lookup.py" "$BIN_DIR/hanzi-lookup.py"
-    chmod +x "$BIN_DIR/hanzi-lookup.py"
-    success "Skrip Python berhasil diperbarui."
-else
-    info "File hanzi-lookup.py tidak ditemukan di $SCRIPT_DIR, melewati..."
-fi
+# Array berisi nama-nama file arsitektur Daemon yang baru
+PYTHON_SCRIPTS=("hanzi-server.py" "hanzi-client.py" "hanzi_lookup.py")
+
+for script in "${PYTHON_SCRIPTS[@]}"; do
+    if [ -f "$SCRIPT_DIR/$script" ]; then
+        info "Menyalin $script ke ~/.local/bin/..."
+        cp "$SCRIPT_DIR/$script" "$BIN_DIR/$script"
+        chmod +x "$BIN_DIR/$script"
+    else
+        # Fallback jika file ada di root project (PROJECT_DIR)
+        if [ -f "$PROJECT_DIR/$script" ]; then
+            info "Menyalin $script ke ~/.local/bin/..."
+            cp "$PROJECT_DIR/$script" "$BIN_DIR/$script"
+            chmod +x "$BIN_DIR/$script"
+        else
+            info "File $script tidak ditemukan, melewati..."
+        fi
+    fi
+done
+
+success "Skrip Python arsitektur Daemon berhasil diperbarui."
 
 # ─── Step 2: Update UI Noctalia ──────────────────────────────────────────────
 step "Step 2: Memperbarui Plugin Noctalia"
