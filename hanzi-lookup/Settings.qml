@@ -16,7 +16,11 @@ Item {
     // ─── Process Helper untuk Restart Daemon ───
     Process {
         id: restartProcess
-        command: ["systemctl", "--user", "restart", "hanzi-server"]
+        command: [
+            "bash",
+            "-c",
+            "pkill -f '[h]anzi-server.py' || true; nohup python3 \"$HOME/.local/bin/hanzi-server.py\" >/tmp/hanzi-server.log 2>&1 &"
+        ]
         running: false
     }
 
