@@ -122,6 +122,19 @@ Item {
     }
 
     Process {
+        id: copyProcess
+        running: false
+
+        onExited: function(exitCode) {
+            if (exitCode === 0) {
+                ToastService.showSuccess("Copied Hanzi")
+            } else {
+                ToastService.showError("Failed to copy Hanzi")
+            }
+        }
+    }
+
+    Process {
         id: translatorProcess
         running: false
 
@@ -172,6 +185,14 @@ Item {
         root.translatorError = ""
         translatorProcess.command = ["python3", root.translatorScript, "--json", "--text", text]
         translatorProcess.running = true
+    }
+
+    function copyTranslatedHanzi() {
+        let text = root.translatorOutput.trim()
+        if (!text || root.translatorBusy || root.translatorError) return
+
+        copyProcess.command = ["wl-copy", text]
+        copyProcess.running = true
     }
 
     // ─── Main Container ─────────────────────────────────────────────────────
@@ -337,10 +358,22 @@ Item {
                     }
                 }
 
-                NText {
-                    text: "Output"
-                    font.weight: Font.Bold
-                    color: Color.mPrimary
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    NText {
+                        text: "Output"
+                        font.weight: Font.Bold
+                        color: Color.mPrimary
+                        Layout.fillWidth: true
+                    }
+
+                    NIconButton {
+                        icon: "copy"
+                        tooltipText: "Copy Hanzi"
+                        visible: root.translatorOutput.length > 0 && !root.translatorBusy && !root.translatorError
+                        onClicked: root.copyTranslatedHanzi()
+                    }
                 }
 
                 Rectangle {
