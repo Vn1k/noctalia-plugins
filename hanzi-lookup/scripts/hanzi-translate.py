@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -14,10 +15,18 @@ CEDICT_PATH = Path.home() / ".local" / "share" / "hanzi-lookup" / "cedict_ts.u8"
 
 
 SYSTEM_PROMPT = """You are a professional native Mandarin Chinese translator.
-Translate Indonesian or English input into natural Simplified Chinese Hanzi.
-Use wording that sounds idiomatic to a native speaker, not literal machine translation.
-Preserve names, numbers, and URLs when appropriate.
-Output ONLY the Chinese translation in Simplified Hanzi. Do not include pinyin, explanations, quotes, labels, markdown, or alternatives."""
+Translate Indonesian or English into natural, idiomatic Simplified Chinese Hanzi.
+
+Your goal is to preserve the original meaning, tone, and all specific details — 
+including names, numbers, and URLs — exactly as they appear. Never infer, expand, 
+omit, or substitute any part of the input.
+
+Use the phrasing a native Mandarin speaker would naturally choose. For example,
+a casual self-introduction sounds more natural as "我叫 X" than "我的名字是 X",
+just as in English "I'm X" feels more natural than "My name is X" in conversation.
+
+Output ONLY the Chinese translation in Simplified Hanzi. No pinyin, no explanations, 
+no quotes, no markdown, no alternatives."""
 
 _dictionary_cache = None
 
@@ -79,9 +88,18 @@ def get_pinyin_for_hanzi(hanzi: str, dictionary: dict | None = None) -> str:
 
         active_dictionary = dictionary if dictionary is not None else get_dictionary()
         _, full_pinyin = lookup_hanzi(hanzi, active_dictionary)
-        return full_pinyin or ""
+        return clean_pinyin_for_display(full_pinyin or "")
     except Exception:
         return ""
+
+
+def clean_pinyin_for_display(pinyin: str) -> str:
+    # If an English name is returned as "K e v i n", keep it readable as "Kevin".
+    return re.sub(
+        r"(?<!\S)(?:[A-Za-z]\s+){1,}[A-Za-z](?=$|\s|[。.,!?，！？、;；:])",
+        lambda match: match.group(0).replace(" ", ""),
+        pinyin,
+    )
 
 
 def build_translation_payload(text: str, dictionary: dict | None = None) -> dict:
