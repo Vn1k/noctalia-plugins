@@ -1,5 +1,7 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Services.UI
@@ -24,10 +26,28 @@ Item {
     property string queryText: ""
     property string currentMode: "OCR"
     property string fullPinyin: ""
+    property string activePage: "results"
     
     // New State for My Dictionary (Favorites)
-    property bool showSavedOnly: false
+    property bool showSavedOnly: activePage === "dictionary"
     property var savedList: []
+
+    // Translator page state
+    readonly property string translatorScript: (Quickshell.env("HOME") || "") + "/.local/bin/hanzi-translate.py"
+    property string translatorInput: ""
+    property string translatorOutput: ""
+    property string translatorPinyin: ""
+    property string translatorError: ""
+    property bool translatorBusy: false
+
+    function openPage(pageName) {
+        root.activePage = pageName
+        if (pageName === "dictionary") {
+            root.loadSavedVocab()
+        } else if (pageName === "results") {
+            root.reloadData()
+        }
+    }
 
     function reloadData() {
         if (!pluginApi) return
@@ -101,11 +121,57 @@ Item {
         running: false
     }
 
+    Process {
+        id: translatorProcess
+        running: false
+
+        stdout: StdioCollector {
+            id: translatorStdout
+        }
+
+        stderr: StdioCollector {
+            id: translatorStderr
+        }
+
+        onExited: function(exitCode) {
+            root.translatorBusy = false
+            if (exitCode === 0) {
+                let rawOutput = translatorStdout.text.trim()
+                try {
+                    let parsed = JSON.parse(rawOutput)
+                    root.translatorOutput = parsed.translation || ""
+                    root.translatorPinyin = parsed.pinyin || ""
+                    root.translatorError = ""
+                } catch (e) {
+                    root.translatorOutput = rawOutput
+                    root.translatorPinyin = ""
+                    root.translatorError = ""
+                }
+            } else {
+                root.translatorOutput = ""
+                root.translatorPinyin = ""
+                root.translatorError = translatorStderr.text.trim() || "Translator failed"
+            }
+        }
+    }
+
     function playTts(text) {
         if (!text) return
         let escapedText = text.replace(/'/g, "'\\''")
         ttsProcess.command = ["bash", "-c", "python3 ~/.local/bin/hanzi-tts.py '" + escapedText + "' &"]
         ttsProcess.running = true
+    }
+
+    function translateInput() {
+        let text = root.translatorInput.trim()
+        if (!text || root.translatorBusy) return
+
+        root.translatorBusy = true
+        root.translatorOutput = "Translating..."
+        root.translatorPinyin = ""
+        root.translatorError = ""
+        translatorProcess.command = ["python3", root.translatorScript, "--json", "--text", text]
+        translatorProcess.running = true
     }
 
     // ─── Main Container ─────────────────────────────────────────────────────
@@ -127,31 +193,41 @@ Item {
 
                 NText {
                     // Changes dynamically depending on mode (Search Results vs My Dictionary)
-                    text: root.showSavedOnly ? "My Dictionary" : (root.queryText ? "结果: " + root.queryText : "Hanzi Lookup")
+                    text: root.activePage === "translator"
+                        ? "AI Translator"
+                        : (root.showSavedOnly ? "My Dictionary" : (root.queryText ? "结果: " + root.queryText : "Hanzi Lookup"))
                     pointSize: Style.fontSizeL
                     font.weight: Font.Bold
                     color: Color.mOnSurface
                     Layout.fillWidth: true
                 }
 
+                NIconButton {
+                    icon: "search"
+                    tooltipText: "Back to Search Results"
+                    visible: root.activePage !== "results"
+                    onClicked: root.openPage("results")
+                }
+
                 // ── Toggle Button for "My Dictionary" (Favorites) ──
                 NIconButton {
-                    icon: root.showSavedOnly ? "search" : "bookmark"
-                    tooltipText: root.showSavedOnly ? "Back to Search" : "Open My Dictionary"
-                    onClicked: {
-                        root.showSavedOnly = !root.showSavedOnly
-                        if (root.showSavedOnly) {
-                            root.loadSavedVocab()
-                        } else {
-                            root.reloadData()
-                        }
-                    }
+                    icon: "bookmark"
+                    tooltipText: "Open My Dictionary"
+                    visible: root.activePage !== "dictionary"
+                    onClicked: root.openPage("dictionary")
+                }
+
+                NIconButton {
+                    icon: "languages"
+                    tooltipText: "Open AI Translator"
+                    visible: root.activePage !== "translator"
+                    onClicked: root.openPage("translator")
                 }
 
                 // ── Main Audio Button (Only appears in search mode) ──
                 NIconButton {
                     icon: "volume-2"
-                    visible: !root.showSavedOnly && root.queryText.length > 0
+                    visible: root.activePage === "results" && root.queryText.length > 0
                     onClicked: root.playTts(root.queryText)
                 }
 
@@ -163,7 +239,7 @@ Item {
 
             // ── Combined Pinyin (Hidden in Dictionary mode) ─────────────────────
             NText {
-                visible: !root.showSavedOnly && root.results.length > 0
+                visible: root.activePage === "results" && root.results.length > 0
                 
                 text: root.fullPinyin
                 pointSize: Style.fontSizeL
@@ -178,7 +254,7 @@ Item {
             // ── AI Translation (Hidden in Dictionary mode) ──────────────────────
             NText {
                 // Teks ini hanya muncul jika mode-nya OCR dan bukan di mode Kamus
-                visible: !root.showSavedOnly && root.results.length > 0 && root.currentMode === "OCR"
+                visible: root.activePage === "results" && root.results.length > 0 && root.currentMode === "OCR"
                 text: pluginApi.pluginSettings.aiTranslation || "Loading AI translation..."
                 pointSize: Style.fontSizeM
                 color: Color.mOnSurfaceVariant  
@@ -194,23 +270,120 @@ Item {
                 height: 1
                 color: Color.mOutline
                 opacity: 0.3
-                visible: root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0)
+                visible: root.activePage !== "translator" && (root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0))
             }
 
             // ── Empty State View ────────────────────────────────────────
             NText {
-                visible: root.showSavedOnly ? (root.savedList.length === 0) : (root.results.length === 0)
+                visible: root.activePage !== "translator" && (root.showSavedOnly ? (root.savedList.length === 0) : (root.results.length === 0))
                 text: root.showSavedOnly ? "Your dictionary is empty" : "No results found"
                 color: Color.mOnSurfaceVariant
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: Style.marginL
             }
 
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: root.activePage === "translator"
+                spacing: Style.marginM
+
+                NText {
+                    text: "Input"
+                    font.weight: Font.Bold
+                    color: Color.mPrimary
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 150 * Style.uiScaleRatio
+                    color: Color.mSurface
+                    border.color: translatorInputArea.activeFocus ? Color.mSecondary : Color.mOutline
+                    border.width: Style.borderS
+                    radius: Style.radiusM
+
+                    TextArea {
+                        id: translatorInputArea
+                        anchors.fill: parent
+                        anchors.margins: Style.marginM
+                        text: root.translatorInput
+                        placeholderText: "Type Indonesian or English text"
+                        wrapMode: TextEdit.WordWrap
+                        selectByMouse: true
+                        color: Color.mOnSurface
+                        placeholderTextColor: Qt.alpha(Color.mOnSurfaceVariant, 0.6)
+                        background: null
+                        font.family: Settings.data.ui.fontDefault
+                        font.pointSize: Style.fontSizeM * Style.uiScaleRatio
+                        onTextChanged: root.translatorInput = text
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    NButton {
+                        text: root.translatorBusy ? "Translating" : "Translate"
+                        icon: "languages"
+                        enabled: root.translatorInput.trim().length > 0 && !root.translatorBusy
+                        onClicked: root.translateInput()
+                    }
+
+                    NIconButton {
+                        icon: "volume-2"
+                        tooltipText: "Play Translation"
+                        visible: root.translatorOutput.length > 0 && !root.translatorBusy
+                        onClicked: root.playTts(root.translatorOutput)
+                    }
+                }
+
+                NText {
+                    text: "Output"
+                    font.weight: Font.Bold
+                    color: Color.mPrimary
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Color.mSurfaceVariant
+                    radius: Style.radiusM
+
+                    NScrollView {
+                        anchors.fill: parent
+                        anchors.margins: Style.marginM
+
+                        ColumnLayout {
+                            width: parent ? parent.width : 0
+                            spacing: Style.marginS
+
+                            NText {
+                                Layout.fillWidth: true
+                                text: root.translatorError ? root.translatorError : (root.translatorOutput || "Translation output will appear here")
+                                color: root.translatorError ? Color.mError : (root.translatorOutput ? Color.mOnSurface : Color.mOnSurfaceVariant)
+                                pointSize: root.translatorOutput && !root.translatorError ? Style.fontSizeXL : Style.fontSizeM
+                                wrapMode: Text.WordWrap
+                            }
+
+                            NText {
+                                Layout.fillWidth: true
+                                visible: root.translatorPinyin.length > 0 && !root.translatorError
+                                text: root.translatorPinyin
+                                color: Color.mPrimary
+                                pointSize: Style.fontSizeM
+                                font.italic: true
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Selected Results / Dictionary List ──────────────────────────────────
             NScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0)
+                visible: root.activePage !== "translator" && (root.showSavedOnly ? (root.savedList.length > 0) : (root.results.length > 0))
 
                 ListView {
                     id: listView

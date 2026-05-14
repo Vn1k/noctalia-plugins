@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 import threading
 import sys
+import importlib.util
 
 from hanzi_lookup import load_cedict, lookup_hanzi, get_ai_translation, process_image_smart
 
@@ -25,6 +26,24 @@ logging.basicConfig(
     ]
 )
 log = logging.getLogger(__name__)
+
+TRANSLATOR_PATH = Path(__file__).with_name("hanzi-translate.py")
+TRANSLATOR_SPEC = importlib.util.spec_from_file_location("hanzi_translate", TRANSLATOR_PATH)
+if TRANSLATOR_SPEC is None or TRANSLATOR_SPEC.loader is None:
+    raise RuntimeError(f"Tidak bisa memuat translator: {TRANSLATOR_PATH}")
+hanzi_translate = importlib.util.module_from_spec(TRANSLATOR_SPEC)
+TRANSLATOR_SPEC.loader.exec_module(hanzi_translate)
+
+
+def recv_all(conn):
+    chunks = []
+    while True:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    return b"".join(chunks).decode("utf-8").strip()
+
 
 def main():
     log.info("Memulai Hanzi Server Daemon (Smart Mode)...")
@@ -45,7 +64,21 @@ def main():
             conn, _ = server.accept()
             image_path = None
             try:
-                image_path = conn.recv(1024).decode().strip()
+                message = recv_all(conn)
+                if not message:
+                    continue
+
+                try:
+                    request = json.loads(message)
+                except json.JSONDecodeError:
+                    request = None
+
+                if isinstance(request, dict) and request.get("type") == "translate":
+                    log.info("Menerima permintaan translator manual")
+                    hanzi_translate.handle_translate_request(conn, request, dictionary)
+                    continue
+
+                image_path = message
                 if not image_path or not os.path.exists(image_path):
                     continue
                 
@@ -75,6 +108,10 @@ def main():
                         
             except Exception as e:
                 log.error(f"Error memproses koneksi: {e}")
+                try:
+                    conn.sendall(json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8"))
+                except Exception:
+                    pass
             finally:
                 conn.close()
                 if image_path and os.path.exists(image_path):

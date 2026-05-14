@@ -280,6 +280,7 @@ deploy_hanzi_lookup() {
         "hanzi-client.py"
         "hanzi_lookup.py"
         "hanzi-tts.py"
+        "hanzi-translate.py"
     )
     local script
 
